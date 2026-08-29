@@ -1,6 +1,6 @@
 // Toda vez que você publicar uma mudança no index.html, aumente esse número.
 // É essa mudança que faz o navegador perceber que existe versão nova.
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = "painel-rota-" + CACHE_VERSION;
 
 const APP_SHELL = ["./", "./index.html", "./manifest.json"];
@@ -22,8 +22,12 @@ self.addEventListener("activate", (e) => {
 });
 
 // Sempre tenta buscar a versão mais nova primeiro; se estiver sem internet, usa a guardada.
+// IMPORTANTE: só faz cache dos arquivos do próprio site (HTML, ícones, manifesto).
+// Chamadas para o Supabase (outro domínio) nunca passam por aqui nem ficam salvas no aparelho.
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return; // deixa passar direto pra rede, sem cache
   e.respondWith(
     fetch(e.request)
       .then((res) => {
