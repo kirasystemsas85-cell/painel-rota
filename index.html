@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Painel de Rota — Manutenção CFTV/Alarme</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#10151b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -170,6 +176,9 @@
   .checkbox-row{display:flex;align-items:center;gap:8px;padding:8px 0;}
   .checkbox-row input{width:auto;}
   .checkbox-row label{margin:0;font-size:13.5px;color:var(--text);}
+
+  .update-bar{position:fixed;left:0;right:0;bottom:0;background:var(--amber);color:#1a1206;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:100;font-size:13.5px;font-weight:600;box-shadow:0 -6px 20px rgba(0,0,0,.35);}
+  .update-bar button{background:#1a1206;color:var(--amber);font-weight:600;font-size:13px;padding:8px 14px;border-radius:8px;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -202,6 +211,7 @@
     osList: [],
     osMonthFilter: null,
     osDaUnidade: [],
+    updateDisponivel: false,
     view: "unidades",     // 'unidades' | 'relatorio' | 'rondas' | 'usuarios'
     tecTab: "fila",         // 'fila' | 'minhas'  (technician sub-tab)
     filter: "todas",       // admin sub-tab
@@ -861,10 +871,15 @@
   }
 
   function render(){
-    if(state.screen==="loading") return `<div class="auth-wrap"><div style="color:var(--text-dim);font-size:13px;">Carregando painel...</div></div>`;
-    if(state.screen==="login") return renderLogin();
-    if(state.screen==="app") return renderApp();
-    return "";
+    let corpo;
+    if(state.screen==="loading") corpo = `<div class="auth-wrap"><div style="color:var(--text-dim);font-size:13px;">Carregando painel...</div></div>`;
+    else if(state.screen==="login") corpo = renderLogin();
+    else if(state.screen==="app") corpo = renderApp();
+    else corpo = "";
+    if(state.updateDisponivel){
+      corpo += `<div class="update-bar"><span>Uma nova versão do app está disponível.</span><button data-action="atualizar-app">Atualizar agora</button></div>`;
+    }
+    return corpo;
   }
 
   function renderLogin(){
@@ -1847,6 +1862,7 @@
       rerender();
       return;
     }
+    if(action==="atualizar-app"){ window.location.reload(); return; }
     if(action==="baixar-pdf-os"){
       const id = t.getAttribute("data-id");
       const os = state.osList.find(x=>x.id===id) || state.osDaUnidade.find(x=>x.id===id);
@@ -2233,6 +2249,23 @@
     state.modal.videoNome = file.name;
     rerender();
   });
+
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", ()=>{
+      navigator.serviceWorker.register("sw.js").then(reg=>{
+        reg.addEventListener("updatefound", ()=>{
+          const novo = reg.installing;
+          if(!novo) return;
+          novo.addEventListener("statechange", ()=>{
+            if(novo.state === "activated" && navigator.serviceWorker.controller){
+              state.updateDisponivel = true;
+              rerender();
+            }
+          });
+        });
+      }).catch(()=>{});
+    });
+  }
 
   boot();
 })();
