@@ -225,6 +225,34 @@
   };
 
   let pollTimer = null;
+  let notifiedAssignedIds = new Set();
+  let notificacoesIniciadas = false;
+
+  function inicializarNotificacoes(){
+    if(notificacoesIniciadas || !state.profile) return;
+    notificacoesIniciadas = true;
+    const myId = state.profile.id;
+    state.units.filter(u=>u.assigned_to===myId).forEach(u=>notifiedAssignedIds.add(u.id));
+  }
+
+  function verificarNovasAtribuicoes(){
+    if(!state.profile || isAdmin()) return;
+    if(!("Notification" in window) || Notification.permission!=="granted") return;
+    const myId = state.profile.id;
+    state.units.filter(u=>u.assigned_to===myId).forEach(u=>{
+      if(!notifiedAssignedIds.has(u.id)){
+        notifiedAssignedIds.add(u.id);
+        const prioridadeTxt = PRIORIDADE_LABEL[u.prioridade] ? (" — " + PRIORIDADE_LABEL[u.prioridade]) : "";
+        try{
+          new Notification("Nova unidade atribuída a você", {
+            body: u.nome + (u.endereco?(" — "+u.endereco):"") + prioridadeTxt,
+            icon: "icon-192.png",
+            tag: "unidade-"+u.id
+          });
+        }catch(e){}
+      }
+    });
+  }
 
   // ---------------- API LAYER ----------------
   async function authFetch(path, opts){
@@ -635,6 +663,7 @@
       state.view = defaultViewFor();
       state.tecTab = "fila";
       state.screen = "app";
+      inicializarNotificacoes();
       rerender();
       startPolling();
     }catch(e){
@@ -662,6 +691,7 @@
         if(hasArea("rondas")) state.rondas = await fetchRondas();
       if(hasArea("rondas") && !(isAdmin() || hasArea("tecnica"))) state.rondaUnidadesLimited = await fetchUnidadesParaRondas();
         state.appSettings = await fetchSettings();
+        verificarNovasAtribuicoes();
         rerender();
       }catch(e){}
     }, REFRESH_MS);
@@ -669,6 +699,7 @@
 
   async function refreshUnits(){
     state.units = await fetchUnits();
+    verificarNovasAtribuicoes();
     rerender();
   }
   async function refreshRondas(){
@@ -940,11 +971,13 @@
       tabs.push(`<button class="nav-tab ${state.view==='ordens' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="ordens">Ordens de Serviço</button>`);
       tabs.push(`<button class="nav-tab ${state.view==='usuarios' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="usuarios">Usuários</button>`);
     }
+    const mostrarSinoNotificacao = !admin && ("Notification" in window) && Notification.permission === "default";
     return `
     <div class="topbar">
       <div class="brand"><span class="brand-dot"></span><div><div class="brand-name">Painel de Rota</div><div class="brand-sub">CFTV &amp; Alarmes</div></div></div>
       <div class="nav-tabs">${tabs.join("")}</div>
       <div class="topbar-spacer"></div>
+      ${mostrarSinoNotificacao ? `<button class="logout-btn" data-action="ativar-notificacoes" title="Receber avisos de novas unidades atribuídas">🔔 Ativar avisos</button>` : ""}
       <span class="who">${admin?"Admin":"Equipe"}: <b>${esc(state.profile.nome)}</b></span>
       <button class="logout-btn" data-action="logout">Sair</button>
     </div>
@@ -1733,6 +1766,7 @@
         state.authError = "";
         state.view = defaultViewFor();
         state.screen = "app";
+        inicializarNotificacoes();
         rerender();
         startPolling();
       }catch(err){
@@ -1866,6 +1900,19 @@
     }
     const action = t.getAttribute("data-action");
 
+    if(action==="ativar-notificacoes"){
+      if(!("Notification" in window)){
+        state.banner = "Este navegador não suporta notificações.";
+        rerender(); setTimeout(()=>{state.banner="";rerender();},4000);
+        return;
+      }
+      Notification.requestPermission().then(perm=>{
+        state.banner = perm==="granted" ? "Avisos ativados! Você será notificado quando receber uma nova unidade." : "Permissão não concedida. Ative depois nas configurações do navegador, se mudar de ideia.";
+        rerender();
+        setTimeout(()=>{state.banner="";rerender();},5000);
+      });
+      return;
+    }
     if(action==="logout"){
       clearSession();
       if(pollTimer) clearInterval(pollTimer);
