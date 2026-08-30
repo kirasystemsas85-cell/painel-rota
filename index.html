@@ -235,6 +235,20 @@
     state.units.filter(u=>u.assigned_to===myId).forEach(u=>notifiedAssignedIds.add(u.id));
   }
 
+  function mostrarNotificacao(titulo, opcoes){
+    if("serviceWorker" in navigator && navigator.serviceWorker.getRegistration){
+      navigator.serviceWorker.getRegistration().then(reg=>{
+        if(reg && reg.showNotification){
+          reg.showNotification(titulo, opcoes);
+        }else{
+          try{ new Notification(titulo, opcoes); }catch(e){}
+        }
+      }).catch(()=>{ try{ new Notification(titulo, opcoes); }catch(e){} });
+    }else{
+      try{ new Notification(titulo, opcoes); }catch(e){}
+    }
+  }
+
   function verificarNovasAtribuicoes(){
     if(!state.profile || isAdmin()) return;
     if(!("Notification" in window) || Notification.permission!=="granted") return;
@@ -243,13 +257,11 @@
       if(!notifiedAssignedIds.has(u.id)){
         notifiedAssignedIds.add(u.id);
         const prioridadeTxt = PRIORIDADE_LABEL[u.prioridade] ? (" — " + PRIORIDADE_LABEL[u.prioridade]) : "";
-        try{
-          new Notification("Nova unidade atribuída a você", {
-            body: u.nome + (u.endereco?(" — "+u.endereco):"") + prioridadeTxt,
-            icon: "icon-192.png",
-            tag: "unidade-"+u.id
-          });
-        }catch(e){}
+        mostrarNotificacao("Nova unidade atribuída a você", {
+          body: u.nome + (u.endereco?(" — "+u.endereco):"") + prioridadeTxt,
+          icon: "icon-192.png",
+          tag: "unidade-"+u.id
+        });
       }
     });
   }
@@ -1907,8 +1919,11 @@
         return;
       }
       Notification.requestPermission().then(perm=>{
-        state.banner = perm==="granted" ? "Avisos ativados! Você será notificado quando receber uma nova unidade." : "Permissão não concedida. Ative depois nas configurações do navegador, se mudar de ideia.";
+        state.banner = perm==="granted" ? "Avisos ativados! Enviando um teste..." : "Permissão não concedida. Ative depois nas configurações do navegador, se mudar de ideia.";
         rerender();
+        if(perm==="granted"){
+          mostrarNotificacao("Avisos ativados ✅", {body:"Esta é uma notificação de teste. Se você a recebeu, está tudo funcionando.", icon:"icon-192.png"});
+        }
         setTimeout(()=>{state.banner="";rerender();},5000);
       });
       return;
