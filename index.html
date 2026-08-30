@@ -692,6 +692,12 @@
     return "ok";
   }
   const STATUS_LABEL = {ok:"OK", problema:"Com problema"};
+  const PRIORIDADE_LABEL = {urgente:"URGENTE", aguardar:"AGUARDAR", obras:"CLIENTE EM OBRAS"};
+  function prioridadeBadge(u){
+    if(!u.prioridade || u.prioridade==="normal") return "";
+    const cls = u.prioridade==="urgente" ? "problema" : "em_rota";
+    return `<span class="status-pill ${cls}">${PRIORIDADE_LABEL[u.prioridade]}</span>`;
+  }
 
   function isToday(iso){
     const d = new Date(iso), now = new Date();
@@ -967,6 +973,7 @@
           <span class="led ${st}"></span>
         </div>
         <span class="status-pill ${st}">${STATUS_LABEL[st]}</span>
+        ${prioridadeBadge(u)}
         <div class="unit-meta">${u.cameras.length} câmera(s)${probCams?` · ${probCams} com problema`:""}</div>
         <div class="unit-actions">
           <button class="btn-sm" data-action="open-unit" data-id="${u.id}">Ver detalhes</button>
@@ -1010,7 +1017,7 @@
       return true;
     });
     const order = {problema:0, ok:1};
-    list = list.slice().sort((a,b)=> order[getStatus(a)]-order[getStatus(b)] || a.nome.localeCompare(b.nome));
+    list = list.slice().sort((a,b)=> (a.prioridade==="urgente"?0:1)-(b.prioridade==="urgente"?0:1) || order[getStatus(a)]-order[getStatus(b)] || a.nome.localeCompare(b.nome));
 
     const cards = list.length ? list.map(u=>{
       const st = getStatus(u);
@@ -1022,11 +1029,14 @@
           <span class="led ${st}"></span>
         </div>
         <span class="status-pill ${st}">${STATUS_LABEL[st]}</span>
+        ${prioridadeBadge(u)}
         ${u.assigned_to_nome ? `<span class="assigned-pill">Com: ${esc(u.assigned_to_nome)}</span>` : ""}
         <div class="unit-meta">${u.cameras.length} câmera(s)${probCams?` · ${probCams} com problema`:""} · atualizado ${fmtDate(u.atualizado_em)}</div>
-        <div class="unit-actions">
+        <div class="unit-actions" style="flex-wrap:wrap;">
           <button class="btn-sm" data-action="open-unit" data-id="${u.id}">Ver detalhes</button>
           <button class="btn-sm route" data-action="route" data-id="${u.id}">Ir / Rota</button>
+          <button class="btn-sm" data-action="abrir-atribuir" data-id="${u.id}">Colaborador</button>
+          <button class="btn-sm" data-action="abrir-prioridade" data-id="${u.id}">Prioridade</button>
         </div>
       </div>`;
     }).join("") : `<div class="empty-state"><div class="display">${units.length?"Nada por aqui com esse filtro":"Nenhuma unidade cadastrada ainda"}</div></div>`;
@@ -1101,6 +1111,7 @@
         <div class="detail-title">${esc(u.nome)}</div>
         <div class="detail-addr">${esc(u.endereco||"Sem endereço cadastrado")}</div>
         <span class="status-pill ${st}" style="margin-top:8px;display:inline-block;">${STATUS_LABEL[st]}</span>
+        ${u.prioridade && u.prioridade!=="normal" ? `<span style="margin-left:6px;">${prioridadeBadge(u)}</span>` : ""}
         ${u.assigned_to_nome ? `<span class="assigned-pill" style="margin-left:6px;">Com: ${esc(u.assigned_to_nome)}</span>` : ""}
       </div>
       <div class="detail-actions">${actions}</div>
@@ -1457,6 +1468,38 @@
     return {tecnica:"Técnica", rondas:"Rondas", rh:"RH"}[a] || a;
   }
   function renderModal(){
+    if(state.modal.kind === "atribuir"){
+      const m = state.modal;
+      const u = state.units.find(x=>x.id===m.unitId);
+      const tecnicos = state.usersList.filter(p=> p.role!=="admin" && (p.areas||[]).includes("tecnica"));
+      return `
+      <div class="modal-overlay" data-action="modal-overlay">
+        <div class="modal-box" data-stop="1">
+          <div class="modal-title">Enviar unidade para técnico</div>
+          <p style="font-size:12.5px;color:var(--text-dim);margin:-8px 0 12px;">${esc(u?u.nome:"")}${u&&u.assigned_to_nome?(" — atualmente com "+u.assigned_to_nome):""}</p>
+          ${tecnicos.length ? tecnicos.map(tc=>`<button type="button" class="btn-outline" style="width:100%;text-align:left;margin-bottom:8px;" data-action="confirmar-atribuir" data-unidade="${u?u.id:''}" data-tecnico="${tc.id}" data-nome="${esc(tc.nome)}">${esc(tc.nome)}</button>`).join("") : `<div class="no-hist">Nenhum técnico cadastrado na área Técnica ainda.</div>`}
+          <div class="modal-actions"><button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button></div>
+        </div>
+      </div>`;
+    }
+    if(state.modal.kind === "prioridade"){
+      const m = state.modal;
+      const u = state.units.find(x=>x.id===m.unitId);
+      const opcoes = [
+        {v:"normal", label:"Normal (sem prioridade)"},
+        {v:"urgente", label:"🔴 Urgente"},
+        {v:"aguardar", label:"🟡 Aguardar"},
+        {v:"obras", label:"🟡 Cliente em obras (aguardar)"}
+      ];
+      return `
+      <div class="modal-overlay" data-action="modal-overlay">
+        <div class="modal-box" data-stop="1">
+          <div class="modal-title">Prioridade — ${esc(u?u.nome:"")}</div>
+          ${opcoes.map(o=>`<button type="button" class="btn-outline" style="width:100%;text-align:left;margin-bottom:8px;${u&&(u.prioridade||'normal')===o.v?'border-color:var(--amber);color:var(--amber);':''}" data-action="confirmar-prioridade" data-id="${u?u.id:''}" data-val="${o.v}">${o.label}</button>`).join("")}
+          <div class="modal-actions"><button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button></div>
+        </div>
+      </div>`;
+    }
     if(state.modal.kind === "import"){
       const m = state.modal;
       if(m.step === "input"){
@@ -1949,6 +1992,38 @@
     if(action==="tec-tab"){ state.tecTab=t.getAttribute("data-tab"); rerender(); return; }
     if(action==="set-filter"){ state.filter=t.getAttribute("data-filter"); rerender(); return; }
 
+    if(action==="abrir-atribuir"){
+      const id = t.getAttribute("data-id");
+      state.modal = {kind:"atribuir", unitId:id};
+      rerender();
+      fetchAllProfiles().then(list=>{ state.usersList = list; rerender(); });
+      return;
+    }
+    if(action==="confirmar-atribuir"){
+      const unidadeId = t.getAttribute("data-unidade");
+      const tecnicoId = t.getAttribute("data-tecnico");
+      const nomeTec = t.getAttribute("data-nome");
+      await apiUpdateUnit(unidadeId, {assigned_to: tecnicoId, assigned_at: new Date().toISOString(), atualizado_em: new Date().toISOString()});
+      await apiAddHistorico(unidadeId, "rota", "Unidade atribuída pelo administrador a " + nomeTec + ".");
+      state.modal = null;
+      state.banner = "Unidade enviada para " + nomeTec + ".";
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 3500);
+      await refreshUnits();
+      return;
+    }
+    if(action==="abrir-prioridade"){
+      state.modal = {kind:"prioridade", unitId:t.getAttribute("data-id")};
+      rerender(); return;
+    }
+    if(action==="confirmar-prioridade"){
+      const id = t.getAttribute("data-id");
+      const val = t.getAttribute("data-val");
+      await apiUpdateUnit(id, {prioridade: val, atualizado_em: new Date().toISOString()});
+      state.modal = null;
+      await refreshUnits();
+      return;
+    }
     if(action==="new-unit"){
       state.modal={mode:"add", draft:{id:null,nome:"",endereco:"",dvr_modelo:"",dvr_ip:"",dvr_usuario:"",dvr_senha:"",dvr_portas:"",central_nome:"",central_codigo:"",central_telefone:""}};
       rerender(); return;
