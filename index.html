@@ -211,6 +211,7 @@
     osList: [],
     osMonthFilter: null,
     osDaUnidade: [],
+    onlineList: [],
     updateDisponivel: false,
     view: "unidades",     // 'unidades' | 'relatorio' | 'rondas' | 'usuarios'
     tecTab: "fila",         // 'fila' | 'minhas'  (technician sub-tab)
@@ -608,6 +609,45 @@
     if(!res.ok) return [];
     return await res.json();
   }
+  async function apiHeartbeat(){
+    if(!state.profile) return null;
+    const res = await authFetch("/rest/v1/presenca?on_conflict=pessoa_id", {
+      method:"POST",
+      headers:{"Prefer":"resolution=merge-duplicates,return=representation"},
+      body: JSON.stringify({pessoa_id: state.profile.id, last_seen: new Date().toISOString()})
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    return data[0];
+  }
+  function responderSolicitacaoLocalizacao(){
+    if(!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>{
+        authFetch("/rest/v1/presenca?pessoa_id=eq."+state.profile.id, {method:"PATCH", body: JSON.stringify({
+          lat: pos.coords.latitude, lng: pos.coords.longitude,
+          loc_atualizada_em: new Date().toISOString(), solicitar_localizacao: false
+        })});
+      },
+      ()=>{
+        authFetch("/rest/v1/presenca?pessoa_id=eq."+state.profile.id, {method:"PATCH", body: JSON.stringify({solicitar_localizacao:false})});
+      },
+      {enableHighAccuracy:true, timeout:10000}
+    );
+  }
+  async function fetchPresencaOnline(){
+    const res = await authFetch("/rest/v1/presenca?select=*");
+    if(!res.ok) return [];
+    return await res.json();
+  }
+  async function apiSolicitarLocalizacao(pessoaId){
+    await authFetch("/rest/v1/presenca?on_conflict=pessoa_id", {
+      method:"POST",
+      headers:{"Prefer":"resolution=merge-duplicates"},
+      body: JSON.stringify({pessoa_id: pessoaId, solicitar_localizacao: true})
+    });
+  }
+
   async function fetchOrdensServico(){
     const res = await authFetch("/rest/v1/ordens_servico?select=*&order=criado_em.desc");
     if(!res.ok) return [];
@@ -705,6 +745,12 @@
         state.appSettings = await fetchSettings();
         verificarNovasAtribuicoes();
         rerender();
+        const minhaPresenca = await apiHeartbeat();
+        if(minhaPresenca && minhaPresenca.solicitar_localizacao) responderSolicitacaoLocalizacao();
+        if(state.view==="online" && isAdmin()){
+          state.onlineList = await fetchPresencaOnline();
+          rerender();
+        }
       }catch(e){}
     }, REFRESH_MS);
   }
@@ -961,6 +1007,8 @@
       body = renderRH();
     } else if(state.view === "ordens"){
       body = renderOrdens();
+    } else if(state.view === "online"){
+      body = renderOnline();
     } else if(state.view === "usuarios"){
       body = renderUsuarios();
     } else if(admin){
@@ -975,6 +1023,9 @@
     }
     if(admin || hasArea("rondas")){
       tabs.push(`<button class="nav-tab ${state.view==='rondas' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="rondas">Rondas</button>`);
+    }
+    if(admin){
+      tabs.push(`<button class="nav-tab ${state.view==='online' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="online">Online</button>`);
     }
     if(admin || hasArea("rh")){
       tabs.push(`<button class="nav-tab ${state.view==='rh' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="rh">Equipe</button>`);
@@ -1427,6 +1478,32 @@
       <div style="font-size:12px;color:var(--text-faint);">${doMes.length} OS neste mês</div>
     </div>
     ${diasHtml}`;
+  }
+
+  // ---------- ONLINE (admin) ----------
+  function renderOnline(){
+    const agora = Date.now();
+    const linhas = state.usersList.length ? state.usersList.map(p=>{
+      const pres = state.onlineList.find(x=>x.pessoa_id===p.id);
+      const online = pres && pres.last_seen && (agora - new Date(pres.last_seen).getTime()) < 90000;
+      const temLoc = pres && pres.lat!=null && pres.lng!=null;
+      return `
+      <div class="user-row">
+        <div class="user-info">
+          <div class="u-name">${esc(p.nome)} <span class="ronda-badge ${online?'feito':'pendente'}">${online?'Online':'Offline'}</span></div>
+          <div class="u-email">${pres&&pres.last_seen?('Visto '+fmtDate(pres.last_seen)):'Nunca visto no app'}</div>
+          ${temLoc?`<div class="u-email">📍 Última localização: ${fmtDate(pres.loc_atualizada_em)}</div>`:""}
+        </div>
+        <div class="unit-actions" style="max-width:300px;flex-wrap:wrap;">
+          ${temLoc?`<a class="btn-sm" href="https://www.google.com/maps?q=${pres.lat},${pres.lng}" target="_blank" style="text-decoration:none;text-align:center;">Ver no mapa</a>`:""}
+          <button class="btn-sm route" data-action="puxar-localizacao" data-id="${p.id}" data-nome="${esc(p.nome)}">📍 Puxar localização</button>
+        </div>
+      </div>`;
+    }).join("") : `<div class="empty-state"><div class="display">Nenhum usuário cadastrado</div></div>`;
+
+    return `
+    <div style="font-size:12px;color:var(--text-faint);margin-bottom:12px;">Atualiza sozinho a cada poucos segundos. "Online" = app aberto nos últimos 90 segundos.</div>
+    ${linhas}`;
   }
 
   function renderRH(){
@@ -1951,6 +2028,10 @@
       if(state.view==="ordens"){
         fetchOrdensServico().then(list=>{ state.osList = list; rerender(); });
       }
+      if(state.view==="online"){
+        fetchAllProfiles().then(list=>{ state.usersList = list; rerender(); });
+        fetchPresencaOnline().then(list=>{ state.onlineList = list; rerender(); });
+      }
       return;
     }
     if(action==="ronda-tab"){ state.rondaTab=t.getAttribute("data-tab"); rerender(); return; }
@@ -1968,6 +2049,19 @@
       return;
     }
     if(action==="atualizar-app"){ window.location.reload(); return; }
+    if(action==="puxar-localizacao"){
+      const id = t.getAttribute("data-id");
+      const nome = t.getAttribute("data-nome");
+      await apiSolicitarLocalizacao(id);
+      state.banner = "Solicitação enviada para " + nome + ". Aguarde alguns segundos...";
+      rerender();
+      setTimeout(async ()=>{
+        state.onlineList = await fetchPresencaOnline();
+        state.banner="";
+        rerender();
+      }, 6000);
+      return;
+    }
     if(action==="baixar-pdf-os"){
       const id = t.getAttribute("data-id");
       const os = state.osList.find(x=>x.id===id) || state.osDaUnidade.find(x=>x.id===id);
