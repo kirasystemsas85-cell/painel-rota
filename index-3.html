@@ -1,0 +1,2613 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Painel de Rota — Manutenção CFTV/Alarme</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#10151b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#10151b;--panel:#1a2129;--panel-alt:#212a33;--border:#2c3742;
+    --text:#e7ebef;--text-dim:#8b96a3;--text-faint:#5c6672;
+    --amber:#f0a94e;--green:#35d399;--red:#f2555f;--radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  #app{min-height:100vh;display:flex;flex-direction:column;}
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  button{font-family:'Inter',sans-serif;cursor:pointer;border:none;}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+  input,textarea,select{font-family:'Inter',sans-serif;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:14px;width:100%;}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--amber);}
+  label{font-size:12px;color:var(--text-dim);display:block;margin:0 0 4px 2px;}
+  ::placeholder{color:var(--text-faint);}
+
+  .auth-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden;background:radial-gradient(circle at 50% 0%, #16202a 0%, var(--bg) 60%);}
+  .auth-wrap::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent);animation:sweep 4.5s linear infinite;opacity:.55;}
+  @keyframes sweep{0%{transform:translateX(-100%);}100%{transform:translateX(100%);}}
+  .auth-card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:28px 26px 24px;position:relative;z-index:1;box-shadow:0 20px 50px -20px rgba(0,0,0,.6);}
+  .auth-led{width:9px;height:9px;border-radius:50%;background:var(--amber);display:inline-block;margin-right:8px;box-shadow:0 0 8px var(--amber);animation:blink 2s ease-in-out infinite;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .auth-title{font-size:19px;font-weight:600;margin:0 0 2px;}
+  .auth-sub{color:var(--text-dim);font-size:13px;margin:0 0 22px;}
+  .field-gap{margin-bottom:14px;}
+  .btn-primary{background:var(--amber);color:#1a1206;font-weight:600;font-size:14px;padding:11px 16px;border-radius:8px;width:100%;}
+  .auth-error{color:var(--red);font-size:13px;margin:-6px 0 14px;}
+
+  .topbar{border-bottom:1px solid var(--border);background:var(--panel);padding:12px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .brand-dot{width:10px;height:10px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);}
+  .brand-name{font-weight:700;font-size:15px;}
+  .brand-sub{font-size:11px;color:var(--text-faint);margin-top:1px;}
+  .nav-tabs{display:flex;gap:6px;}
+  .nav-tab{background:none;color:var(--text-dim);font-size:13px;padding:7px 12px;border-radius:7px;border:1px solid transparent;}
+  .nav-tab.active{background:var(--panel-alt);color:var(--text);border-color:var(--border);}
+  .topbar-spacer{flex:1;}
+  .who{font-size:12px;color:var(--text-dim);margin-right:6px;}
+  .who b{color:var(--text);}
+  .logout-btn{background:none;color:var(--text-dim);font-size:13px;border:1px solid var(--border);padding:7px 12px;border-radius:7px;}
+
+  .content{flex:1;padding:20px;max-width:1100px;margin:0 auto;width:100%;}
+  .banner{background:#2a2010;border:1px solid #5a4a2a;color:var(--amber);font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:14px;}
+
+  .summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+  .summary-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+  .summary-num{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;line-height:1;}
+  .summary-label{font-size:11px;color:var(--text-dim);margin-top:5px;text-transform:uppercase;}
+
+  .controls-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+  .search-input{max-width:280px;}
+  .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:3px;}
+  .tab{background:none;color:var(--text-dim);font-size:12.5px;padding:7px 12px;border-radius:6px;}
+  .tab.active{background:var(--panel-alt);color:var(--text);}
+  .tab .cnt{opacity:.6;margin-left:4px;}
+  .spacer-flex{flex:1;}
+  .btn-add{background:var(--amber);color:#1a1206;font-weight:600;font-size:13.5px;padding:9px 15px;border-radius:8px;white-space:nowrap;}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .unit-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:15px 15px 13px;display:flex;flex-direction:column;gap:8px;}
+  .unit-card.st-problema{border-color:#5a2a2f;}
+  .unit-card.st-em_rota{border-color:#5a4a2a;}
+  .unit-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .unit-name{font-weight:600;font-size:14.5px;line-height:1.3;}
+  .unit-addr{font-size:12px;color:var(--text-dim);margin-top:2px;}
+  .led{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+  .led.ok{background:var(--green);box-shadow:0 0 6px var(--green);}
+  .led.problema{background:var(--red);box-shadow:0 0 6px var(--red);animation:pulse-red 1.3s ease-in-out infinite;}
+  .led.em_rota{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+  @keyframes pulse-red{0%,100%{opacity:1;}50%{opacity:.4;}}
+  .status-pill{font-size:10.5px;padding:2px 8px;border-radius:20px;text-transform:uppercase;font-weight:600;width:fit-content;}
+  .status-pill.ok{background:#123d2e;color:var(--green);}
+  .status-pill.problema{background:#3d1418;color:var(--red);}
+  .status-pill.em_rota{background:#3d2f14;color:var(--amber);}
+  .assigned-pill{font-size:10.5px;padding:2px 8px;border-radius:20px;background:#132a3d;color:#5aa9e6;width:fit-content;}
+  .unit-meta{font-size:11.5px;color:var(--text-faint);}
+  .unit-actions{display:flex;gap:7px;margin-top:4px;}
+  .btn-sm{flex:1;background:var(--panel-alt);color:var(--text);font-size:12.5px;padding:8px 8px;border-radius:7px;border:1px solid var(--border);text-align:center;}
+  .btn-sm.route{background:var(--amber);color:#1a1206;border-color:var(--amber);font-weight:600;}
+  .empty-state{grid-column:1/-1;text-align:center;padding:50px 20px;color:var(--text-dim);}
+  .empty-state .display{font-size:16px;color:var(--text);margin-bottom:6px;}
+
+  .back-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+  .back-btn{background:none;color:var(--text-dim);font-size:13px;border:1px solid var(--border);padding:7px 12px;border-radius:7px;}
+  .detail-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
+  .detail-title{font-size:21px;font-weight:700;}
+  .detail-addr{color:var(--text-dim);font-size:13px;margin-top:4px;}
+  .detail-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn-outline{background:none;border:1px solid var(--border);color:var(--text);font-size:13px;padding:9px 14px;border-radius:8px;}
+  .btn-danger-outline{background:none;border:1px solid #5a2a2f;color:var(--red);font-size:13px;padding:9px 14px;border-radius:8px;}
+
+  .panel-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px;}
+  .panel-box h3{font-size:13px;text-transform:uppercase;color:var(--text-dim);margin:0 0 12px;font-weight:600;}
+  .kv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 16px;}
+  .kv-item .kv-label{font-size:11px;color:var(--text-faint);margin-bottom:2px;}
+  .kv-item .kv-val{font-size:13.5px;}
+  .kv-empty{color:var(--text-faint);font-style:italic;}
+
+  .cam-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .cam-row:last-child{border-bottom:none;}
+  .cam-name{flex:1;font-size:13.5px;}
+  .cam-toggle{display:flex;gap:4px;background:var(--panel-alt);border-radius:7px;padding:3px;}
+  .cam-toggle button{font-size:11.5px;padding:5px 10px;border-radius:5px;background:none;color:var(--text-dim);}
+  .cam-toggle button.active.ok{background:#123d2e;color:var(--green);}
+  .cam-toggle button.active.problema{background:#3d1418;color:var(--red);}
+  .cam-del{background:none;color:var(--text-faint);font-size:16px;padding:2px 6px;}
+  .add-cam-row{display:flex;gap:8px;margin-top:10px;}
+  .add-cam-row input{flex:1;}
+  .btn-mini{background:var(--panel-alt);border:1px solid var(--border);color:var(--text);font-size:13px;padding:9px 13px;border-radius:8px;white-space:nowrap;}
+
+  .hist-entry{padding:10px 0;border-bottom:1px solid var(--border);}
+  .hist-entry:last-child{border-bottom:none;}
+  .hist-date{font-size:11px;color:var(--text-faint);margin-bottom:3px;}
+  .hist-date b{color:var(--text-dim);}
+  .hist-text{font-size:13.5px;line-height:1.5;white-space:pre-wrap;}
+  .hist-tag{font-size:9.5px;text-transform:uppercase;padding:1px 6px;border-radius:10px;background:var(--panel-alt);color:var(--text-dim);margin-left:6px;}
+  .hist-add textarea{min-height:64px;resize:vertical;margin-bottom:8px;}
+  .no-hist{color:var(--text-faint);font-size:13px;font-style:italic;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(6,9,12,.7);display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;z-index:50;}
+  .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:560px;padding:22px 24px 20px;}
+  .modal-title{font-size:17px;font-weight:700;margin:0 0 16px;}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .form-section{margin-bottom:16px;}
+  .form-section-label{font-size:12px;text-transform:uppercase;color:var(--amber);margin-bottom:8px;font-weight:600;}
+  .modal-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+  .btn-cancel{background:none;border:1px solid var(--border);color:var(--text-dim);font-size:13.5px;padding:10px 16px;border-radius:8px;}
+
+  .report-row{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;}
+  .report-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+  .report-unit{font-weight:600;font-size:14px;}
+  .report-meta{font-size:11.5px;color:var(--text-faint);}
+  .report-tech{font-size:12px;color:#5aa9e6;}
+  .report-text{font-size:13.5px;line-height:1.5;white-space:pre-wrap;}
+  .report-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+
+  @media (max-width:640px){
+    .summary-row{grid-template-columns:repeat(2,1fr);}
+    .form-row{grid-template-columns:1fr;}
+    .content{padding:14px;}
+    .kv-grid{grid-template-columns:1fr 1fr;}
+  }
+
+  /* ---------- RONDAS ---------- */
+  .ronda-badge{font-size:10.5px;padding:2px 8px;border-radius:20px;text-transform:uppercase;font-weight:600;width:fit-content;}
+  .ronda-badge.feito{background:#123d2e;color:var(--green);}
+  .ronda-badge.pendente{background:var(--panel-alt);color:var(--text-faint);}
+  .photo-thumb{width:100%;height:150px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:var(--panel-alt);margin-bottom:8px;}
+  .report-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:12px;}
+  .report-card-body{padding:12px 14px;}
+
+  /* ---------- USUARIOS ---------- */
+  .user-row{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .user-info .u-name{font-weight:600;font-size:14px;}
+  .user-info .u-email{font-size:12px;color:var(--text-dim);}
+  .user-tags{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;}
+  .user-tag{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--panel-alt);color:var(--text-dim);text-transform:uppercase;}
+  .user-tag.admin{background:#3d2f14;color:var(--amber);}
+  .checkbox-row{display:flex;align-items:center;gap:8px;padding:8px 0;}
+  .checkbox-row input{width:auto;}
+  .checkbox-row label{margin:0;font-size:13.5px;color:var(--text);}
+
+  .update-bar{position:fixed;left:0;right:0;bottom:0;background:var(--amber);color:#1a1206;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:100;font-size:13.5px;font-weight:600;box-shadow:0 -6px 20px rgba(0,0,0,.35);}
+  .update-bar button{background:#1a1206;color:var(--amber);font-weight:600;font-size:13px;padding:8px 14px;border-radius:8px;white-space:nowrap;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  const SUPABASE_URL = "https://erudkobuwgzuiqikjzki.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_tB5nCjfLIhNynitU5EGAbQ_QAglnoHS";
+  const SESSION_KEY = "cftv_session";
+  const REFRESH_MS = 8000;
+
+  let state = {
+    screen: "loading",
+    authError: "",
+    session: null,       // {access_token, refresh_token, expires_at, user}
+    profile: null,        // {id, nome, role, areas}
+    units: [],
+    rondas: [],
+    rondaUnidadesLimited: [],
+    rondaTab: "fazer",     // 'fazer' | 'relatorio'
+    rondaSearch: "",
+    usersList: [],
+    appSettings: {tecnica_bloqueada:false, rondas_bloqueada:false, rh_bloqueada:false, endereco_base:"", empresa_nome:""},
+    baseEnderecoDraft: null,
+    empresaNomeDraft: null,
+    presencas: [],
+    osList: [],
+    osMonthFilter: null,
+    osDaUnidade: [],
+    onlineList: [],
+    updateDisponivel: false,
+    view: "unidades",     // 'unidades' | 'relatorio' | 'rondas' | 'usuarios'
+    tecTab: "fila",         // 'fila' | 'minhas'  (technician sub-tab)
+    filter: "todas",       // admin sub-tab
+    currentUnitId: null,
+    search: "",
+    modal: null,
+    banner: "",
+    newCameraName: {},
+    noteDraft: {},
+    pdfBusy: false
+  };
+
+  let pollTimer = null;
+  let notifiedAssignedIds = new Set();
+  let notifiedConviteIds = new Set();
+  let notifiedApoioIds = new Set();
+  let notificacoesIniciadas = false;
+
+  function inicializarNotificacoes(){
+    if(notificacoesIniciadas || !state.profile) return;
+    notificacoesIniciadas = true;
+    const myId = state.profile.id;
+    state.units.forEach(u=>{
+      if(u.assigned_to===myId){
+        notifiedAssignedIds.add(u.id);
+        if(u.apoio_tecnico_id) notifiedApoioIds.add(u.id+":"+u.apoio_tecnico_id);
+      }
+      if((u.tecnicos_convidados||[]).includes(myId)) notifiedConviteIds.add(u.id);
+    });
+  }
+
+  function mostrarNotificacao(titulo, opcoes){
+    if("serviceWorker" in navigator && navigator.serviceWorker.getRegistration){
+      navigator.serviceWorker.getRegistration().then(reg=>{
+        if(reg && reg.showNotification){
+          reg.showNotification(titulo, opcoes);
+        }else{
+          try{ new Notification(titulo, opcoes); }catch(e){}
+        }
+      }).catch(()=>{ try{ new Notification(titulo, opcoes); }catch(e){} });
+    }else{
+      try{ new Notification(titulo, opcoes); }catch(e){}
+    }
+  }
+
+  function verificarNovasAtribuicoes(){
+    if(!state.profile || isAdmin()) return;
+    if(!("Notification" in window) || Notification.permission!=="granted") return;
+    const myId = state.profile.id;
+    state.units.forEach(u=>{
+      if(u.assigned_to===myId && !notifiedAssignedIds.has(u.id)){
+        notifiedAssignedIds.add(u.id);
+        const prioridadeTxt = PRIORIDADE_LABEL[u.prioridade] ? (" — " + PRIORIDADE_LABEL[u.prioridade]) : "";
+        mostrarNotificacao("Nova unidade atribuída a você", {
+          body: u.nome + (u.endereco?(" — "+u.endereco):"") + prioridadeTxt,
+          icon: "icon-192.png",
+          tag: "unidade-"+u.id
+        });
+      }
+      if((u.tecnicos_convidados||[]).includes(myId) && !notifiedConviteIds.has(u.id)){
+        notifiedConviteIds.add(u.id);
+        const ehApoio = !!u.assigned_to;
+        const prioridadeTxt = PRIORIDADE_LABEL[u.prioridade] ? (" — " + PRIORIDADE_LABEL[u.prioridade]) : "";
+        mostrarNotificacao(ehApoio ? "Pedido de apoio" : "Nova unidade disponível", {
+          body: u.nome + (ehApoio ? " precisa de apoio" : (" — convite para atender" + prioridadeTxt)),
+          icon: "icon-192.png",
+          tag: "convite-"+u.id
+        });
+      }
+      if(u.assigned_to===myId && u.apoio_tecnico_id){
+        const chave = u.id+":"+u.apoio_tecnico_id;
+        if(!notifiedApoioIds.has(chave)){
+          notifiedApoioIds.add(chave);
+          mostrarNotificacao("Apoio confirmado", {
+            body: (u.apoio_tecnico_nome||"Um técnico") + " vai te ajudar na unidade " + u.nome + ".",
+            icon: "icon-192.png",
+            tag: "apoio-"+u.id
+          });
+        }
+      }
+    });
+  }
+
+  // ---------------- API LAYER ----------------
+  async function authFetch(path, opts){
+    opts = opts || {};
+    const headers = Object.assign({
+      "apikey": SUPABASE_KEY,
+      "Content-Type": "application/json"
+    }, opts.headers||{});
+    if(state.session && state.session.access_token){
+      headers["Authorization"] = "Bearer " + state.session.access_token;
+    }
+    let res = await fetch(SUPABASE_URL + path, Object.assign({}, opts, {headers}));
+    if(res.status === 401 && state.session && state.session.refresh_token){
+      const ok = await refreshSession();
+      if(ok){
+        headers["Authorization"] = "Bearer " + state.session.access_token;
+        res = await fetch(SUPABASE_URL + path, Object.assign({}, opts, {headers}));
+      }
+    }
+    return res;
+  }
+
+  async function loginWithPassword(email, password){
+    const res = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=password", {
+      method: "POST",
+      headers: {"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+      body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error_description || data.msg || "Usuário ou senha incorretos.");
+    return {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: Date.now() + (data.expires_in*1000),
+      user: data.user
+    };
+  }
+
+  async function refreshSession(){
+    try{
+      const res = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=refresh_token", {
+        method: "POST",
+        headers: {"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+        body: JSON.stringify({refresh_token: state.session.refresh_token})
+      });
+      const data = await res.json();
+      if(!res.ok) return false;
+      state.session = {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: Date.now() + (data.expires_in*1000),
+        user: data.user
+      };
+      persistSession();
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function persistSession(){
+    try{ localStorage.setItem(SESSION_KEY, JSON.stringify(state.session)); }catch(e){}
+  }
+  function loadSession(){
+    try{
+      const raw = localStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function clearSession(){
+    try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+  }
+
+  async function fetchProfile(userId){
+    const res = await authFetch("/rest/v1/profiles?id=eq." + userId + "&select=*");
+    const data = await res.json();
+    return data[0] || null;
+  }
+
+  async function fetchUnits(){
+    const res = await authFetch("/rest/v1/unidades?select=*,cameras(*),historico(*),assigned:profiles(nome)&order=nome.asc");
+    if(!res.ok){
+      let detail = "HTTP " + res.status;
+      try{ const d = await res.json(); detail = d.message || d.error || JSON.stringify(d); }catch(e){}
+      state.banner = "Não foi possível carregar as unidades: " + detail;
+      return [];
+    }
+    const data = await res.json();
+    data.forEach(u=>{
+      u.historico.sort((a,b)=> new Date(b.criado_em)-new Date(a.criado_em));
+      u.assigned_to_nome = u.assigned ? u.assigned.nome : null;
+    });
+    return data;
+  }
+
+  async function apiCreateUnit(payload){
+    const res = await authFetch("/rest/v1/unidades", {method:"POST", headers:{"Prefer":"return=representation"}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    return data[0];
+  }
+  async function apiUpdateUnit(id, payload){
+    const res = await authFetch("/rest/v1/unidades?id=eq."+id, {method:"PATCH", headers:{"Prefer":"return=representation"}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    return data[0];
+  }
+  async function apiDeleteUnit(id){
+    await authFetch("/rest/v1/unidades?id=eq."+id, {method:"DELETE"});
+  }
+  async function apiClaimUnit(id, userId){
+    const res = await authFetch("/rest/v1/unidades?id=eq."+id+"&assigned_to=is.null", {
+      method:"PATCH", headers:{"Prefer":"return=representation"},
+      body: JSON.stringify({assigned_to:userId, assigned_at:new Date().toISOString(), tecnicos_convidados:[]})
+    });
+    const data = await res.json();
+    return data.length>0;
+  }
+  async function apiConvidarTecnicos(unidadeId, idsArray){
+    await authFetch("/rest/v1/unidades?id=eq."+unidadeId, {
+      method:"PATCH",
+      body: JSON.stringify({tecnicos_convidados: idsArray})
+    });
+  }
+  async function apiAceitarApoio(unidadeId, userId, nome){
+    const res = await authFetch("/rest/v1/unidades?id=eq."+unidadeId+"&apoio_tecnico_id=is.null", {
+      method:"PATCH", headers:{"Prefer":"return=representation"},
+      body: JSON.stringify({apoio_tecnico_id:userId, apoio_tecnico_nome:nome, apoio_aceito_em:new Date().toISOString(), tecnicos_convidados:[]})
+    });
+    const data = await res.json();
+    return data.length>0;
+  }
+  async function apiReleaseUnit(id){
+    await authFetch("/rest/v1/unidades?id=eq."+id, {
+      method:"PATCH", headers:{"Prefer":"return=representation"},
+      body: JSON.stringify({assigned_to:null, assigned_at:null})
+    });
+  }
+  async function apiAddCamera(unidade_id, nome){
+    await authFetch("/rest/v1/cameras", {method:"POST", body: JSON.stringify({unidade_id, nome, status:"ok"})});
+  }
+  async function apiUpdateCamera(id, status){
+    await authFetch("/rest/v1/cameras?id=eq."+id, {method:"PATCH", body: JSON.stringify({status})});
+  }
+  async function apiDeleteCamera(id){
+    await authFetch("/rest/v1/cameras?id=eq."+id, {method:"DELETE"});
+  }
+  async function apiSalvarOS(unidade_id, servico_texto, responsavel_nome, assinatura_tecnico, assinatura_responsavel, foto_path, video_path){
+    const res = await authFetch("/rest/v1/ordens_servico", {method:"POST", headers:{"Prefer":"return=representation"}, body: JSON.stringify({
+      unidade_id, tecnico_id: state.profile.id, tecnico_nome: state.profile.nome,
+      servico_texto, responsavel_nome, assinatura_tecnico, assinatura_responsavel, foto_path, video_path
+    })});
+    const data = await res.json();
+    return data[0];
+  }
+
+  async function apiAddHistorico(unidade_id, tipo, texto, ajudantes){
+    await authFetch("/rest/v1/historico", {method:"POST", body: JSON.stringify({
+      unidade_id, tecnico_id: state.profile.id, tecnico_nome: state.profile.nome, tipo, texto, ajudantes: ajudantes||null
+    })});
+  }
+
+  async function fetchUnidadesParaRondas(){
+    const res = await authFetch("/rest/v1/rpc/unidades_para_rondas", {method:"POST", body: JSON.stringify({})});
+    if(!res.ok) return [];
+    return await res.json();
+  }
+  function unitsForRondas(){
+    return (isAdmin() || hasArea("tecnica")) ? state.units : state.rondaUnidadesLimited;
+  }
+
+  // ---- RONDAS ----
+  async function fetchRondas(){
+    const res = await authFetch("/rest/v1/rondas?select=*&order=criado_em.desc");
+    if(!res.ok) return [];
+    return await res.json();
+  }
+  async function apiUploadOsAnexo(file, unidadeId, prefixo){
+    const partesNome = (file.name||"arquivo").split(".");
+    const ext = partesNome.length>1 ? partesNome.pop() : (file.type.includes("video")?"mp4":"jpg");
+    const path = unidadeId + "/" + prefixo + "_" + Date.now() + "_" + Math.random().toString(36).slice(2,7) + "." + ext;
+    const res = await authFetch("/storage/v1/object/os-anexos/" + path, {
+      method: "POST",
+      headers: {"Content-Type": file.type || "application/octet-stream"},
+      body: file
+    });
+    if(!res.ok){
+      let detail = "HTTP " + res.status;
+      try{ const d = await res.json(); detail = d.message || d.error || JSON.stringify(d); }catch(e){}
+      throw new Error(detail);
+    }
+    return path;
+  }
+
+  async function apiUploadFoto(file, unidadeId){
+    const ext = (file.type && file.type.includes("png")) ? "png" : "jpg";
+    const path = unidadeId + "/" + Date.now() + "_" + Math.random().toString(36).slice(2,7) + "." + ext;
+    const res = await authFetch("/storage/v1/object/rondas/" + path, {
+      method: "POST",
+      headers: {"Content-Type": file.type || "image/jpeg"},
+      body: file
+    });
+    if(!res.ok){
+      let detail = "HTTP " + res.status;
+      try{
+        const d = await res.json();
+        detail = d.message || d.error || d.error_description || JSON.stringify(d);
+      }catch(e){
+        try{ detail = await res.text(); }catch(e2){}
+      }
+      throw new Error(detail);
+    }
+    return path;
+  }
+  async function apiInsertRonda(unidade_id, foto_path){
+    await authFetch("/rest/v1/rondas", {method:"POST", body: JSON.stringify({
+      unidade_id, tecnico_id: state.profile.id, tecnico_nome: state.profile.nome, foto_path
+    })});
+  }
+  async function apiDeleteRonda(id, foto_path){
+    await authFetch("/rest/v1/rondas?id=eq."+id, {method:"DELETE"});
+    try{ await authFetch("/storage/v1/object/rondas/"+foto_path, {method:"DELETE"}); }catch(e){}
+  }
+  async function fetchFotoBlobUrl(path){
+    const res = await authFetch("/storage/v1/object/authenticated/rondas/" + path);
+    if(!res.ok) return null;
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  }
+  async function fetchFotoBase64(path){
+    const res = await authFetch("/storage/v1/object/authenticated/rondas/" + path);
+    if(!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise(resolve=>{
+      const reader = new FileReader();
+      reader.onloadend = ()=> resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function fetchOsAnexoBase64(path){
+    const res = await authFetch("/storage/v1/object/authenticated/os-anexos/" + path);
+    if(!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise(resolve=>{
+      const reader = new FileReader();
+      reader.onloadend = ()=> resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  }
+  function fetchOsAnexoUrl(path){
+    return SUPABASE_URL + "/storage/v1/object/authenticated/os-anexos/" + path;
+  }
+
+  async function gerarPdfOSBlob(os, unidade){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:"pt", format:"a4"});
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    let y = 50;
+
+    doc.setFontSize(16);
+    doc.text(state.appSettings.empresa_nome || "Empresa", margin, y);
+    y += 16;
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(state.appSettings.endereco_base || "", margin, y);
+    doc.setTextColor(0);
+    y += 26;
+
+    doc.setFontSize(13);
+    doc.text("ORDEM DE SERVIÇO", margin, y);
+    y += 22;
+
+    doc.setFontSize(10);
+    doc.text("Unidade: " + (unidade ? unidade.nome : "—"), margin, y); y += 14;
+    doc.text("Endereço: " + (unidade && unidade.endereco ? unidade.endereco : "—"), margin, y); y += 14;
+    doc.text("Técnico: " + (os.tecnico_nome || "—"), margin, y); y += 14;
+    doc.text("Responsável pela unidade: " + (os.responsavel_nome || "—"), margin, y); y += 14;
+    doc.text("Data: " + fmtDate(os.criado_em), margin, y); y += 20;
+
+    doc.setFontSize(10);
+    doc.text("Serviço executado:", margin, y); y += 14;
+    const linhas = doc.splitTextToSize(os.servico_texto || "(sem descrição)", pageW - margin*2);
+    doc.text(linhas, margin, y);
+    y += linhas.length*13 + 12;
+
+    if(os.foto_path){
+      try{
+        const dataUrl = await fetchOsAnexoBase64(os.foto_path);
+        if(dataUrl){
+          const imgW = pageW - margin*2;
+          const imgH = imgW * 0.6;
+          if(y + imgH > 740){ doc.addPage(); y = 50; }
+          doc.setFontSize(9);
+          doc.text("Foto do serviço:", margin, y); y += 10;
+          doc.addImage(dataUrl, "JPEG", margin, y, imgW, imgH);
+          y += imgH + 16;
+        }
+      }catch(e){}
+    }
+    if(os.video_path){
+      if(y > 730){ doc.addPage(); y = 50; }
+      doc.setFontSize(9);
+      doc.setTextColor(120);
+      doc.text("Vídeo anexado ao registro (não incluso neste PDF, disponível no sistema).", margin, y);
+      doc.setTextColor(0);
+      y += 22;
+    }
+
+    if(y > 650){ doc.addPage(); y = 60; }
+    y += 14;
+    doc.setFontSize(10);
+    doc.text("Assinatura do técnico", margin, y);
+    doc.text("Assinatura do responsável", pageW/2 + 10, y);
+    y += 8;
+    const sigW = pageW/2 - margin - 15;
+    const sigH = 70;
+    try{ if(os.assinatura_tecnico) doc.addImage(os.assinatura_tecnico, "PNG", margin, y, sigW, sigH); }catch(e){}
+    try{ if(os.assinatura_responsavel) doc.addImage(os.assinatura_responsavel, "PNG", pageW/2 + 10, y, sigW, sigH); }catch(e){}
+
+    const nomeArq = "OS-" + (unidade ? unidade.nome.replace(/[^a-zA-Z0-9]+/g,"-") : "unidade") + "-" + new Date(os.criado_em).toISOString().slice(0,10) + ".pdf";
+    return {doc, nomeArquivo: nomeArq};
+  }
+
+  async function baixarPdfOS(os, unidade){
+    const {doc, nomeArquivo} = await gerarPdfOSBlob(os, unidade);
+    doc.save(nomeArquivo);
+  }
+
+  async function compartilharOuBaixarPdfOS(os, unidade){
+    const {doc, nomeArquivo} = await gerarPdfOSBlob(os, unidade);
+    const blob = doc.output("blob");
+    try{
+      const file = new File([blob], nomeArquivo, {type:"application/pdf"});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({
+          files:[file],
+          title: "Ordem de Serviço",
+          text: "Ordem de serviço" + (unidade?(" — "+unidade.nome):"")
+        });
+        return "compartilhado";
+      }
+    }catch(err){
+      if(err && err.name === "AbortError") return "cancelado";
+      // qualquer outra falha do compartilhamento -> cai para baixar normal
+    }
+    doc.save(nomeArquivo);
+    return "baixado";
+  }
+
+  // ---- USUÁRIOS (admin) ----
+  async function fetchAllProfiles(){
+    const res = await authFetch("/rest/v1/profiles?select=*&order=nome.asc");
+    if(!res.ok) return [];
+    return await res.json();
+  }
+  function todayDateStr(){
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+  async function fetchPresencasHoje(){
+    const res = await authFetch("/rest/v1/presencas?data=eq."+todayDateStr()+"&select=*");
+    if(!res.ok) return [];
+    return await res.json();
+  }
+  async function apiHeartbeat(){
+    if(!state.profile) return null;
+    const res = await authFetch("/rest/v1/presenca?on_conflict=pessoa_id", {
+      method:"POST",
+      headers:{"Prefer":"resolution=merge-duplicates,return=representation"},
+      body: JSON.stringify({pessoa_id: state.profile.id, last_seen: new Date().toISOString()})
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    return data[0];
+  }
+  function responderSolicitacaoLocalizacao(){
+    if(!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>{
+        authFetch("/rest/v1/presenca?pessoa_id=eq."+state.profile.id, {method:"PATCH", body: JSON.stringify({
+          lat: pos.coords.latitude, lng: pos.coords.longitude,
+          loc_atualizada_em: new Date().toISOString(), solicitar_localizacao: false
+        })});
+      },
+      ()=>{
+        authFetch("/rest/v1/presenca?pessoa_id=eq."+state.profile.id, {method:"PATCH", body: JSON.stringify({solicitar_localizacao:false})});
+      },
+      {enableHighAccuracy:true, timeout:10000}
+    );
+  }
+  async function fetchPresencaOnline(){
+    const res = await authFetch("/rest/v1/presenca?select=*");
+    if(!res.ok) return [];
+    return await res.json();
+  }
+  async function apiSolicitarLocalizacao(pessoaId){
+    await authFetch("/rest/v1/presenca?on_conflict=pessoa_id", {
+      method:"POST",
+      headers:{"Prefer":"resolution=merge-duplicates"},
+      body: JSON.stringify({pessoa_id: pessoaId, solicitar_localizacao: true})
+    });
+  }
+
+  async function fetchOrdensServico(){
+    const res = await authFetch("/rest/v1/ordens_servico?select=*&order=criado_em.desc");
+    if(!res.ok) return [];
+    return await res.json();
+  }
+  async function fetchOrdensServicoUnidade(unidadeId){
+    const res = await authFetch("/rest/v1/ordens_servico?unidade_id=eq."+unidadeId+"&select=*&order=criado_em.desc");
+    if(!res.ok) return [];
+    return await res.json();
+  }
+  async function apiMarcarPresenca(pessoa_id, status){
+    await authFetch("/rest/v1/presencas?on_conflict=pessoa_id,data", {
+      method:"POST",
+      headers:{"Prefer":"resolution=merge-duplicates,return=representation"},
+      body: JSON.stringify({pessoa_id, data: todayDateStr(), status, atualizado_em: new Date().toISOString()})
+    });
+  }
+  async function fetchSettings(){
+    const res = await authFetch("/rest/v1/app_settings?id=eq.1&select=*");
+    if(!res.ok) return {tecnica_bloqueada:false, rondas_bloqueada:false};
+    const data = await res.json();
+    return data[0] || {tecnica_bloqueada:false, rondas_bloqueada:false};
+  }
+  async function apiUpdateSettings(payload){
+    await authFetch("/rest/v1/app_settings?id=eq.1", {method:"PATCH", body: JSON.stringify(payload)});
+  }
+  async function apiSignupAuthUser(email, password){
+    const res = await fetch(SUPABASE_URL + "/auth/v1/signup", {
+      method: "POST",
+      headers: {"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+      body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.msg || data.error_description || "Não foi possível criar o login.");
+    if(!data.id && !(data.user && data.user.id)) throw new Error("Resposta inesperada ao criar login.");
+    return data.id ? data : data.user;
+  }
+  async function apiCreateProfile(payload){
+    const res = await authFetch("/rest/v1/profiles", {method:"POST", headers:{"Prefer":"return=representation"}, body: JSON.stringify(payload)});
+    if(!res.ok){ const d = await res.json().catch(()=>({})); throw new Error(d.message || "Não foi possível salvar o perfil."); }
+    const data = await res.json();
+    return data[0];
+  }
+  async function apiUpdateProfile(id, payload){
+    await authFetch("/rest/v1/profiles?id=eq."+id, {method:"PATCH", body: JSON.stringify(payload)});
+  }
+  async function apiDeleteProfile(id){
+    await authFetch("/rest/v1/profiles?id=eq."+id, {method:"DELETE"});
+  }
+
+  // ---------------- BOOTSTRAP ----------------
+  async function boot(){
+    const s = loadSession();
+    if(!s){ state.screen="login"; rerender(); return; }
+    state.session = s;
+    try{
+      const profile = await fetchProfile(s.user.id);
+      if(!profile){ state.authError="Sua conta não tem um perfil cadastrado. Peça ao administrador para te cadastrar."; state.screen="login"; clearSession(); state.session=null; rerender(); return; }
+      if(profile.ativo === false){ state.authError="Seu acesso foi bloqueado pelo administrador."; state.screen="login"; clearSession(); state.session=null; rerender(); return; }
+      state.profile = profile;
+      state.units = await fetchUnits();
+      if(hasArea("rondas")) state.rondas = await fetchRondas();
+      if(hasArea("rondas") && !(isAdmin() || hasArea("tecnica"))) state.rondaUnidadesLimited = await fetchUnidadesParaRondas();
+      state.appSettings = await fetchSettings();
+      state.view = defaultViewFor();
+      state.tecTab = "fila";
+      state.screen = "app";
+      inicializarNotificacoes();
+      rerender();
+      startPolling();
+    }catch(e){
+      state.screen="login"; rerender();
+    }
+  }
+
+  function startPolling(){
+    if(pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async ()=>{
+      if(!state.session || state.modal) return;
+      try{
+        const freshProfile = await fetchProfile(state.session.user.id);
+        if(!freshProfile || freshProfile.ativo === false){
+          clearInterval(pollTimer);
+          clearSession();
+          state.session=null; state.profile=null; state.units=[]; state.currentUnitId=null;
+          state.authError = "Seu acesso foi bloqueado pelo administrador.";
+          state.screen="login";
+          rerender();
+          return;
+        }
+        state.profile = freshProfile;
+        state.units = await fetchUnits();
+        if(hasArea("rondas")) state.rondas = await fetchRondas();
+      if(hasArea("rondas") && !(isAdmin() || hasArea("tecnica"))) state.rondaUnidadesLimited = await fetchUnidadesParaRondas();
+        state.appSettings = await fetchSettings();
+        verificarNovasAtribuicoes();
+        rerender();
+        const minhaPresenca = await apiHeartbeat();
+        if(minhaPresenca && minhaPresenca.solicitar_localizacao) responderSolicitacaoLocalizacao();
+        if(state.view==="online" && isAdmin()){
+          state.onlineList = await fetchPresencaOnline();
+          rerender();
+        }
+      }catch(e){}
+    }, REFRESH_MS);
+  }
+
+  async function refreshUnits(){
+    state.units = await fetchUnits();
+    verificarNovasAtribuicoes();
+    rerender();
+  }
+  async function refreshRondas(){
+    state.rondas = await fetchRondas();
+    rerender();
+  }
+
+  // ---------------- HELPERS ----------------
+  function isAdmin(){ return !!(state.profile && state.profile.role === "admin"); }
+  function hasArea(a){ return isAdmin() || !!(state.profile && Array.isArray(state.profile.areas) && state.profile.areas.includes(a)); }
+  function defaultViewFor(){
+    if(isAdmin()) return "unidades";
+    if(hasArea("tecnica")) return "unidades";
+    if(hasArea("rondas")) return "rondas";
+    if(hasArea("rh")) return "rh";
+    return "unidades";
+  }
+
+  function getStatus(unit){
+    if(unit.cameras.some(c=>c.status==="problema")) return "problema";
+    return "ok";
+  }
+  const STATUS_LABEL = {ok:"OK", problema:"Com problema"};
+  const PRIORIDADE_LABEL = {urgente:"URGENTE", aguardar:"AGUARDAR", obras:"CLIENTE EM OBRAS"};
+  function prioridadeBadge(u){
+    if(!u.prioridade || u.prioridade==="normal") return "";
+    const cls = u.prioridade==="urgente" ? "problema" : "em_rota";
+    return `<span class="status-pill ${cls}">${PRIORIDADE_LABEL[u.prioridade]}</span>`;
+  }
+
+  function isToday(iso){
+    const d = new Date(iso), now = new Date();
+    return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate();
+  }
+
+  function openRouteFor(unit){
+    const q = encodeURIComponent(unit.endereco || unit.nome);
+    window.open("https://www.google.com/maps/search/?api=1&query="+q, "_blank");
+  }
+
+  function compartilharLocalizacao(unit){
+    if(!navigator.geolocation){
+      state.banner = "Este navegador não permite acessar a localização.";
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 5000);
+      return;
+    }
+    state.banner = "Obtendo sua localização...";
+    rerender();
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>{
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        const linkLoc = "https://www.google.com/maps?q=" + lat + "," + lng;
+        const msg = "Estou a caminho da unidade " + unit.nome + (unit.endereco?(" ("+unit.endereco+")"):"") + ". Minha localização atual: " + linkLoc;
+        window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+        state.banner = "";
+        rerender();
+      },
+      (err)=>{
+        let motivo = "não foi possível obter sua localização.";
+        if(err && err.code===1) motivo = "permissão de localização negada. Ative nas configurações do navegador/app.";
+        else if(err && err.code===2) motivo = "localização indisponível no momento.";
+        else if(err && err.code===3) motivo = "demorou demais pra responder, tente de novo.";
+        state.banner = "Não foi possível compartilhar: " + motivo;
+        rerender();
+        setTimeout(()=>{ state.banner=""; rerender(); }, 6000);
+      },
+      {enableHighAccuracy:true, timeout:12000}
+    );
+  }
+
+  function abrirPlanoDeRota(){
+    const myId = state.profile.id;
+    const minhas = state.units.filter(u=> u.assigned_to === myId && (u.endereco||u.nome));
+    if(!minhas.length) return;
+    const enderecos = minhas.map(u=> encodeURIComponent(u.endereco || u.nome));
+    const destination = enderecos[enderecos.length-1];
+    const waypoints = enderecos.slice(0,-1).join("|");
+    let url = "https://www.google.com/maps/dir/?api=1&travelmode=driving";
+    const base = (state.appSettings.endereco_base||"").trim();
+    if(base) url += "&origin=" + encodeURIComponent(base);
+    url += "&destination=" + destination;
+    if(waypoints) url += "&waypoints=" + waypoints;
+    window.open(url, "_blank");
+  }
+
+  function esc(s){
+    if(s===undefined||s===null) return "";
+    return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function fmtDate(iso){
+    const d = new Date(iso);
+    return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  }
+  function uid(){ return "id"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  function setupSignaturePad(canvas){
+    if(!canvas || canvas.dataset.padReady==="1") return;
+    canvas.dataset.padReady = "1";
+    const ctx = canvas.getContext("2d");
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#111";
+    let drawing = false, last = null;
+    function pos(e){
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) * (canvas.width / rect.width),
+        y: (e.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+    canvas.addEventListener("pointerdown", e=>{
+      drawing = true; last = pos(e);
+      canvas.setPointerCapture(e.pointerId);
+      canvas.dataset.assinado = "1";
+    });
+    canvas.addEventListener("pointermove", e=>{
+      if(!drawing) return;
+      const p = pos(e);
+      ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+      last = p;
+    });
+    canvas.addEventListener("pointerup", ()=>{ drawing=false; });
+    canvas.addEventListener("pointercancel", ()=>{ drawing=false; });
+  }
+  function limparAssinatura(canvas){
+    if(!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    canvas.dataset.assinado = "0";
+  }
+  function restaurarAssinatura(canvas, dataUrl){
+    if(!canvas || !dataUrl) return;
+    const img = new Image();
+    img.onload = ()=>{ canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height); };
+    img.src = dataUrl;
+    canvas.dataset.assinado = "1";
+  }
+
+  function parseUnidadesTexto(texto){
+    const linhas = texto.split("\n").map(l=>l.trim()).filter(Boolean);
+    return linhas.map((linha, idx)=>{
+      const grupos = [...linha.matchAll(/\(([^)]*)\)/g)].map(m=>m[1].trim());
+      if(grupos.length < 3){
+        return {linha: idx+1, bruto: linha, erro: "Não encontrei os 3 grupos entre parênteses (nome), (endereço), (câmeras)."};
+      }
+      const nome = grupos[0];
+      const endereco = grupos[1];
+      const camSpec = grupos[2];
+      let qtdCameras = 0;
+      const range = camSpec.match(/(\d+)\s*a\s*(\d+)/i);
+      if(range){
+        qtdCameras = parseInt(range[2],10) - parseInt(range[1],10) + 1;
+      }else{
+        const num = camSpec.match(/(\d+)/);
+        if(num) qtdCameras = parseInt(num[1],10);
+      }
+      if(!nome){
+        return {linha: idx+1, bruto: linha, erro: "Nome da unidade veio vazio."};
+      }
+      if(!qtdCameras || qtdCameras<1 || qtdCameras>200){
+        return {linha: idx+1, bruto: linha, erro: "Não entendi a quantidade de câmeras em \"" + camSpec + "\"."};
+      }
+      return {linha: idx+1, nome, endereco, qtdCameras};
+    });
+  }
+
+  function copyTextToClipboard(text){
+    if(navigator.clipboard && window.isSecureContext){
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject)=>{
+      try{
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if(ok) resolve(); else reject(new Error("copy failed"));
+      }catch(e){ reject(e); }
+    });
+  }
+
+  // ---------------- RENDER (focus-preserving) ----------------
+  function rerender(){
+    if(state.modal && state.modal.kind==="assinatura"){
+      const sigTec = document.getElementById("sig-tecnico");
+      const sigResp = document.getElementById("sig-responsavel");
+      if(sigTec && sigTec.dataset.assinado==="1") state.modal.sigTecnicoDataUrl = sigTec.toDataURL("image/png");
+      if(sigResp && sigResp.dataset.assinado==="1") state.modal.sigResponsavelDataUrl = sigResp.toDataURL("image/png");
+    }
+    const active = document.activeElement;
+    let restore = null;
+    if(active && active.id) restore = {id:active.id, start:active.selectionStart, end:active.selectionEnd};
+    document.getElementById("app").innerHTML = render();
+    bindEvents();
+    if(restore){
+      const el = document.getElementById(restore.id);
+      if(el){ el.focus(); if(typeof restore.start==="number" && el.setSelectionRange){ try{ el.setSelectionRange(restore.start, restore.end); }catch(e){} } }
+    }
+  }
+
+  function render(){
+    let corpo;
+    if(state.screen==="loading") corpo = `<div class="auth-wrap"><div style="color:var(--text-dim);font-size:13px;">Carregando painel...</div></div>`;
+    else if(state.screen==="login") corpo = renderLogin();
+    else if(state.screen==="app") corpo = renderApp();
+    else corpo = "";
+    if(state.updateDisponivel){
+      corpo += `<div class="update-bar"><span>Uma nova versão do app está disponível.</span><button data-action="atualizar-app">Atualizar agora</button></div>`;
+    }
+    return corpo;
+  }
+
+  function renderLogin(){
+    return `
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <div style="margin-bottom:16px;"><span class="auth-led"></span><span class="brand-name">Painel de Rota</span></div>
+        <h1 class="auth-title">Entrar</h1>
+        <p class="auth-sub">Manutenção de câmeras e alarmes — unidades da região.</p>
+        ${state.authError ? `<div class="auth-error">${esc(state.authError)}</div>` : ""}
+        <form id="login-form">
+          <div class="field-gap"><label>E-mail</label><input id="login-email" type="email" autocomplete="username" required></div>
+          <div class="field-gap"><label>Senha</label><input id="login-pass" type="password" autocomplete="current-password" required></div>
+          <button class="btn-primary" type="submit" id="login-submit">Entrar</button>
+        </form>
+      </div>
+    </div>`;
+  }
+
+  function renderApp(){
+    const admin = isAdmin();
+    let body;
+    if(state.currentUnitId){
+      body = renderDetail();
+    } else if(state.view === "relatorio"){
+      body = renderReport();
+    } else if(state.view === "rondas"){
+      body = renderRondas();
+    } else if(state.view === "rh"){
+      body = renderRH();
+    } else if(state.view === "ordens"){
+      body = renderOrdens();
+    } else if(state.view === "online"){
+      body = renderOnline();
+    } else if(state.view === "usuarios"){
+      body = renderUsuarios();
+    } else if(admin){
+      body = renderAdminUnidades();
+    } else {
+      body = renderTecUnidades();
+    }
+    const tabs = [];
+    if(admin || hasArea("tecnica")){
+      tabs.push(`<button class="nav-tab ${state.view==='unidades' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="unidades">Unidades</button>`);
+      tabs.push(`<button class="nav-tab ${state.view==='relatorio' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="relatorio">Relatório do dia</button>`);
+    }
+    if(admin || hasArea("rondas")){
+      tabs.push(`<button class="nav-tab ${state.view==='rondas' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="rondas">Rondas</button>`);
+    }
+    if(admin){
+      tabs.push(`<button class="nav-tab ${state.view==='online' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="online">Online</button>`);
+    }
+    if(admin || hasArea("rh")){
+      tabs.push(`<button class="nav-tab ${state.view==='rh' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="rh">Equipe</button>`);
+    }
+    if(admin){
+      tabs.push(`<button class="nav-tab ${state.view==='ordens' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="ordens">Ordens de Serviço</button>`);
+      tabs.push(`<button class="nav-tab ${state.view==='usuarios' && !state.currentUnitId ? 'active':''}" data-action="nav" data-view="usuarios">Usuários</button>`);
+    }
+    const mostrarSinoNotificacao = !admin && ("Notification" in window) && Notification.permission === "default";
+    return `
+    <div class="topbar">
+      <div class="brand"><span class="brand-dot"></span><div><div class="brand-name">Painel de Rota</div><div class="brand-sub">CFTV &amp; Alarmes</div></div></div>
+      <div class="nav-tabs">${tabs.join("")}</div>
+      <div class="topbar-spacer"></div>
+      ${mostrarSinoNotificacao ? `<button class="logout-btn" data-action="ativar-notificacoes" title="Receber avisos de novas unidades atribuídas">🔔 Ativar avisos</button>` : ""}
+      <span class="who">${admin?"Admin":"Equipe"}: <b>${esc(state.profile.nome)}</b></span>
+      <button class="logout-btn" data-action="logout">Sair</button>
+    </div>
+    <div class="content">
+      ${state.banner ? `<div class="banner">${esc(state.banner)}</div>` : ""}
+      ${body}
+    </div>
+    ${state.modal ? renderModal() : ""}
+    `;
+  }
+
+  // ---------- TECHNICIAN VIEW ----------
+  function renderTecUnidades(){
+    const myId = state.profile.id;
+    const fila = state.units.filter(u=> !u.assigned_to && (getStatus(u)==="problema" || (u.tecnicos_convidados||[]).includes(myId)));
+    const minhas = state.units.filter(u=> u.assigned_to === myId);
+    const apoio = state.units.filter(u=> u.assigned_to && u.assigned_to!==myId && !u.apoio_tecnico_id && (u.tecnicos_convidados||[]).includes(myId));
+    const list = state.tecTab==="fila" ? fila : state.tecTab==="apoio" ? apoio : minhas;
+
+    const cards = list.length ? list.map(u=>{
+      const st = getStatus(u);
+      const probCams = u.cameras.filter(c=>c.status==="problema").length;
+      const convidado = (u.tecnicos_convidados||[]).includes(myId);
+      let botaoPrincipal;
+      if(state.tecTab==="fila") botaoPrincipal = `<button class="btn-sm route" data-action="claim" data-id="${u.id}">Assumir</button>`;
+      else if(state.tecTab==="apoio") botaoPrincipal = `<button class="btn-sm route" data-action="aceitar-apoio" data-id="${u.id}">Aceitar apoio</button>`;
+      else botaoPrincipal = `<button class="btn-sm route" data-action="route" data-id="${u.id}">Ir / Rota</button>`;
+      return `
+      <div class="unit-card st-${st}">
+        <div class="unit-card-top">
+          <div><div class="unit-name">${esc(u.nome)}</div><div class="unit-addr">${esc(u.endereco||"Sem endereço cadastrado")}</div></div>
+          <span class="led ${st}"></span>
+        </div>
+        <span class="status-pill ${st}">${STATUS_LABEL[st]}</span>
+        ${prioridadeBadge(u)}
+        ${convidado && state.tecTab!=="minhas" ? `<span class="assigned-pill">Convite</span>` : ""}
+        ${state.tecTab==="apoio" ? `<span class="assigned-pill">Com: ${esc(u.assigned_to_nome||"—")}</span>` : ""}
+        <div class="unit-meta">${u.cameras.length} câmera(s)${probCams?` · ${probCams} com problema`:""}</div>
+        <div class="unit-actions">
+          <button class="btn-sm" data-action="open-unit" data-id="${u.id}">Ver detalhes</button>
+          ${botaoPrincipal}
+        </div>
+        ${state.tecTab==="minhas" ? `<div class="unit-actions"><button class="btn-sm" data-action="compartilhar-localizacao" data-id="${u.id}">📍 Compartilhar localização</button></div>` : ""}
+      </div>`;
+    }).join("") : `<div class="empty-state"><div class="display">${state.tecTab==="fila"?"Nenhuma unidade com problema ou convite no momento":state.tecTab==="apoio"?"Nenhum pedido de apoio no momento":"Você não está atendendo nenhuma unidade agora"}</div></div>`;
+
+    return `
+    <div class="controls-row">
+      <div class="tabs">
+        <button class="tab ${state.tecTab==='fila'?'active':''}" data-action="tec-tab" data-tab="fila">Fila de problemas <span class="cnt">${fila.length}</span></button>
+        <button class="tab ${state.tecTab==='minhas'?'active':''}" data-action="tec-tab" data-tab="minhas">Minhas unidades <span class="cnt">${minhas.length}</span></button>
+        <button class="tab ${state.tecTab==='apoio'?'active':''}" data-action="tec-tab" data-tab="apoio">Pedidos de apoio <span class="cnt">${apoio.length}</span></button>
+      </div>
+      <div class="spacer-flex"></div>
+      ${state.tecTab==="minhas" && minhas.length ? `<button class="btn-add" data-action="plano-rota">Plano de rota (${minhas.length})</button>` : ""}
+    </div>
+    <div class="grid">${cards}</div>`;
+  }
+
+  // ---------- ADMIN VIEW ----------
+  function renderAdminUnidades(){
+    const units = state.units;
+    const counts = {
+      todas: units.length,
+      problema: units.filter(u=>getStatus(u)==="problema").length,
+      atribuidas: units.filter(u=>u.assigned_to).length,
+      ok: units.filter(u=>getStatus(u)==="ok").length
+    };
+    let list = units.filter(u=>{
+      if(state.filter==="problema" && getStatus(u)!=="problema") return false;
+      if(state.filter==="atribuidas" && !u.assigned_to) return false;
+      if(state.filter==="ok" && getStatus(u)!=="ok") return false;
+      if(state.search){
+        const s = state.search.toLowerCase();
+        if(!u.nome.toLowerCase().includes(s) && !(u.endereco||"").toLowerCase().includes(s)) return false;
+      }
+      return true;
+    });
+    const order = {problema:0, ok:1};
+    list = list.slice().sort((a,b)=> (a.prioridade==="urgente"?0:1)-(b.prioridade==="urgente"?0:1) || order[getStatus(a)]-order[getStatus(b)] || a.nome.localeCompare(b.nome));
+
+    const cards = list.length ? list.map(u=>{
+      const st = getStatus(u);
+      const probCams = u.cameras.filter(c=>c.status==="problema").length;
+      return `
+      <div class="unit-card st-${st}">
+        <div class="unit-card-top">
+          <div><div class="unit-name">${esc(u.nome)}</div><div class="unit-addr">${esc(u.endereco||"Sem endereço cadastrado")}</div></div>
+          <span class="led ${st}"></span>
+        </div>
+        <span class="status-pill ${st}">${STATUS_LABEL[st]}</span>
+        ${prioridadeBadge(u)}
+        ${u.assigned_to_nome ? `<span class="assigned-pill">Com: ${esc(u.assigned_to_nome)}</span>` : ""}
+        <div class="unit-meta">${u.cameras.length} câmera(s)${probCams?` · ${probCams} com problema`:""} · atualizado ${fmtDate(u.atualizado_em)}</div>
+        <div class="unit-actions" style="flex-wrap:wrap;">
+          <button class="btn-sm" data-action="open-unit" data-id="${u.id}">Ver detalhes</button>
+          <button class="btn-sm route" data-action="route" data-id="${u.id}">Ir / Rota</button>
+          <button class="btn-sm" data-action="abrir-atribuir" data-id="${u.id}">Colaborador</button>
+          <button class="btn-sm" data-action="abrir-prioridade" data-id="${u.id}">Prioridade</button>
+        </div>
+      </div>`;
+    }).join("") : `<div class="empty-state"><div class="display">${units.length?"Nada por aqui com esse filtro":"Nenhuma unidade cadastrada ainda"}</div></div>`;
+
+    return `
+    <div class="summary-row">
+      <div class="summary-card"><div class="summary-num">${counts.todas}</div><div class="summary-label">Unidades</div></div>
+      <div class="summary-card"><div class="summary-num" style="color:var(--red)">${counts.problema}</div><div class="summary-label">Com problema</div></div>
+      <div class="summary-card"><div class="summary-num" style="color:#5aa9e6">${counts.atribuidas}</div><div class="summary-label">Em atendimento</div></div>
+      <div class="summary-card"><div class="summary-num" style="color:var(--green)">${counts.ok}</div><div class="summary-label">OK</div></div>
+    </div>
+    <div class="controls-row">
+      <input id="search-input" class="search-input" type="text" placeholder="Buscar unidade ou endereço..." value="${esc(state.search)}">
+      <div class="tabs">
+        <button class="tab ${state.filter==='todas'?'active':''}" data-action="set-filter" data-filter="todas">Todas <span class="cnt">${counts.todas}</span></button>
+        <button class="tab ${state.filter==='problema'?'active':''}" data-action="set-filter" data-filter="problema">Problema <span class="cnt">${counts.problema}</span></button>
+        <button class="tab ${state.filter==='atribuidas'?'active':''}" data-action="set-filter" data-filter="atribuidas">Em atend. <span class="cnt">${counts.atribuidas}</span></button>
+        <button class="tab ${state.filter==='ok'?'active':''}" data-action="set-filter" data-filter="ok">OK <span class="cnt">${counts.ok}</span></button>
+      </div>
+      <div class="spacer-flex"></div>
+      <button class="btn-outline" data-action="open-import">Importar em massa</button>
+      <button class="btn-add" data-action="new-unit">+ Nova unidade</button>
+    </div>
+    <div class="grid">${cards}</div>`;
+  }
+
+  // ---------- DETAIL (shared, role-aware) ----------
+  function renderDetail(){
+    const u = state.units.find(x=>x.id===state.currentUnitId);
+    if(!u){ state.currentUnitId=null; return renderApp(); }
+    const isAdmin = state.profile.role==="admin";
+    const myId = state.profile.id;
+    const st = getStatus(u);
+    const mine = u.assigned_to === myId;
+
+    const camsHtml = u.cameras.length ? u.cameras.map(c=>`
+      <div class="cam-row">
+        <div class="cam-name">${esc(c.nome)}</div>
+        <div class="cam-toggle">
+          <button class="${c.status==='ok'?'active ok':''}" data-action="cam-status" data-cam="${c.id}" data-val="ok">OK</button>
+          <button class="${c.status==='problema'?'active problema':''}" data-action="cam-status" data-cam="${c.id}" data-val="problema">Problema</button>
+        </div>
+        ${isAdmin?`<button class="cam-del" data-action="cam-remove" data-cam="${c.id}" title="Remover">×</button>`:""}
+      </div>`).join("") : `<div class="no-hist">Nenhuma câmera cadastrada.</div>`;
+
+    const histHtml = u.historico.length ? u.historico.map(h=>`
+      <div class="hist-entry"><div class="hist-date"><b>${esc(h.tecnico_nome||"—")}</b> · ${fmtDate(h.criado_em)}${h.tipo==='conclusao'?'<span class="hist-tag">concluído</span>':''}</div><div class="hist-text">${esc(h.texto)}</div></div>
+    `).join("") : `<div class="no-hist">Sem registros ainda.</div>`;
+
+    const dvr = {modelo:u.dvr_modelo, ip:u.dvr_ip, usuario:u.dvr_usuario, senha:u.dvr_senha, portas:u.dvr_portas};
+    const central = {nome:u.central_nome, codigo:u.central_codigo, telefone:u.central_telefone};
+
+    let actions = `<button class="btn-add" data-action="route" data-id="${u.id}">Ir / Rota</button>`;
+    if(!isAdmin){
+      if(!u.assigned_to){
+        actions += `<button class="btn-outline" data-action="claim" data-id="${u.id}">Assumir unidade</button>`;
+      }else if(mine){
+        actions += `<button class="btn-outline" data-action="compartilhar-localizacao" data-id="${u.id}">📍 Compartilhar localização</button>`;
+        actions += `<button class="btn-outline" data-action="abrir-pedir-apoio" data-id="${u.id}">Pedir apoio</button>`;
+        actions += `<button class="btn-outline" data-action="release" data-id="${u.id}">Liberar</button>`;
+        actions += `<button class="btn-outline" data-action="abrir-assinatura" data-id="${u.id}">Assinar OS</button>`;
+        actions += `<button class="btn-add" data-action="open-conclude" data-id="${u.id}">Concluir visita</button>`;
+      }
+    }else{
+      actions += `<button class="btn-outline" data-action="edit-unit" data-id="${u.id}">Editar dados</button>`;
+      actions += `<button class="btn-danger-outline" data-action="delete-unit" data-id="${u.id}">Excluir</button>`;
+    }
+
+    return `
+    <div class="back-row"><button class="back-btn" data-action="back">← Voltar</button></div>
+    <div class="detail-head">
+      <div>
+        <div class="detail-title">${esc(u.nome)}</div>
+        <div class="detail-addr">${esc(u.endereco||"Sem endereço cadastrado")}</div>
+        <span class="status-pill ${st}" style="margin-top:8px;display:inline-block;">${STATUS_LABEL[st]}</span>
+        ${u.prioridade && u.prioridade!=="normal" ? `<span style="margin-left:6px;">${prioridadeBadge(u)}</span>` : ""}
+        ${u.assigned_to_nome ? `<span class="assigned-pill" style="margin-left:6px;">Com: ${esc(u.assigned_to_nome)}</span>` : ""}
+        ${u.apoio_tecnico_nome ? `<span class="assigned-pill" style="margin-left:6px;">Apoio: ${esc(u.apoio_tecnico_nome)}</span>` : ""}
+      </div>
+      <div class="detail-actions">${actions}</div>
+    </div>
+
+    <div class="panel-box"><h3>DVR</h3><div class="kv-grid">
+      <div class="kv-item"><div class="kv-label">Modelo</div><div class="kv-val">${dvr.modelo?esc(dvr.modelo):`<span class="kv-empty">não informado</span>`}</div></div>
+      <div class="kv-item"><div class="kv-label">IP</div><div class="kv-val mono">${dvr.ip?esc(dvr.ip):`<span class="kv-empty">—</span>`}</div></div>
+      <div class="kv-item"><div class="kv-label">Usuário</div><div class="kv-val mono">${dvr.usuario?esc(dvr.usuario):`<span class="kv-empty">—</span>`}</div></div>
+      <div class="kv-item"><div class="kv-label">Senha</div><div class="kv-val mono">${dvr.senha?esc(dvr.senha):`<span class="kv-empty">—</span>`}</div></div>
+      <div class="kv-item"><div class="kv-label">Portas</div><div class="kv-val mono">${dvr.portas?esc(dvr.portas):`<span class="kv-empty">—</span>`}</div></div>
+    </div></div>
+
+    <div class="panel-box"><h3>Central de monitoramento</h3><div class="kv-grid">
+      <div class="kv-item"><div class="kv-label">Central</div><div class="kv-val">${central.nome?esc(central.nome):`<span class="kv-empty">não informado</span>`}</div></div>
+      <div class="kv-item"><div class="kv-label">Código do cliente</div><div class="kv-val mono">${central.codigo?esc(central.codigo):`<span class="kv-empty">—</span>`}</div></div>
+      <div class="kv-item"><div class="kv-label">Telefone</div><div class="kv-val mono">${central.telefone?esc(central.telefone):`<span class="kv-empty">—</span>`}</div></div>
+    </div></div>
+
+    <div class="panel-box"><h3>Câmeras</h3>${camsHtml}
+      ${isAdmin ? `<div class="add-cam-row"><input id="new-cam-input" type="text" placeholder="Nome/número da câmera" value="${esc(state.newCameraName[u.id]||'')}"><button class="btn-mini" data-action="add-camera" data-id="${u.id}">Adicionar</button></div>` : ""}
+    </div>
+
+    <div class="panel-box"><h3>Histórico</h3>
+      ${mine ? `<div class="hist-add"><textarea id="note-input" placeholder="Anotação rápida (opcional, sem concluir a visita)...">${esc(state.noteDraft[u.id]||'')}</textarea><button class="btn-mini" data-action="add-nota" data-id="${u.id}">Registrar anotação</button></div>` : ""}
+      ${histHtml}
+    </div>
+
+    <div class="panel-box"><h3>Ordens de serviço assinadas</h3>
+      ${state.osDaUnidade.length ? state.osDaUnidade.map(os=>`
+        <div class="hist-entry">
+          <div class="hist-date"><b>${esc(os.tecnico_nome||"—")}</b> · ${fmtDate(os.criado_em)} · Responsável: ${esc(os.responsavel_nome||"—")}</div>
+          <div class="hist-text">${esc(os.servico_texto||"(sem descrição)")}</div>
+          <div class="unit-actions" style="margin-top:6px;max-width:220px;"><button class="btn-sm" data-action="baixar-pdf-os" data-id="${os.id}">Baixar / Enviar PDF</button></div>
+        </div>`).join("") : `<div class="no-hist">Nenhuma OS assinada ainda nesta unidade.</div>`}
+    </div>
+    `;
+  }
+
+  // ---------- REPORT ----------
+  function renderReport(){
+    const entries = [];
+    state.units.forEach(u=>{
+      u.historico.filter(h=>h.tipo==="conclusao" && isToday(h.criado_em)).forEach(h=>{
+        entries.push({unidade:u.nome, tecnico:h.tecnico_nome, texto:h.texto, data:h.criado_em});
+      });
+    });
+    entries.sort((a,b)=> new Date(b.data)-new Date(a.data));
+
+    const rows = entries.length ? entries.map(e=>`
+      <div class="report-row">
+        <div class="report-top"><span class="report-unit">${esc(e.unidade)}</span><span class="report-meta">${fmtDate(e.data)}</span></div>
+        <div class="report-tech">${esc(e.tecnico||"—")}</div>
+        <div class="report-text">${esc(e.texto||"(sem descrição)")}</div>
+      </div>`).join("") : `<div class="empty-state"><div class="display">Nenhuma visita concluída hoje ainda</div></div>`;
+
+    return `
+    <div class="report-toolbar">
+      <h3 style="margin:0;">Relatório de hoje — ${new Date().toLocaleDateString("pt-BR")}</h3>
+      <button class="btn-outline" data-action="copy-report" ${entries.length?"":"disabled"}>Copiar relatório do dia</button>
+    </div>
+    ${rows}`;
+  }
+
+  function buildPresencaText(){
+    const presMap = {};
+    state.presencas.forEach(p=>{ presMap[p.pessoa_id] = p.status; });
+    const dataFmt = new Date().toLocaleDateString("pt-BR");
+    let txt = "Presença — " + dataFmt + "\n\n";
+    state.usersList.forEach(p=>{
+      const st = presMap[p.id];
+      const label = st==="presente" ? "Presente" : st==="falta" ? "Faltou" : "Não marcado";
+      txt += p.nome + " - " + label + "\n";
+    });
+    return txt;
+  }
+
+  function buildReportText(){
+    const entries = [];
+    state.units.forEach(u=>{
+      u.historico.filter(h=>h.tipo==="conclusao" && isToday(h.criado_em)).forEach(h=>{
+        entries.push({unidade:u.nome, tecnico:h.tecnico_nome||"—", ajudantes:h.ajudantes, texto:h.texto, data:h.criado_em});
+      });
+    });
+    entries.sort((a,b)=> new Date(a.data)-new Date(b.data));
+
+    // agrupa por técnico, na ordem de quem concluiu a primeira visita primeiro
+    const grupos = [];
+    const idx = {};
+    entries.forEach(e=>{
+      if(!(e.tecnico in idx)){ idx[e.tecnico] = grupos.length; grupos.push({tecnico:e.tecnico, itens:[]}); }
+      grupos[idx[e.tecnico]].itens.push(e);
+    });
+
+    if(!grupos.length) return "Nenhuma visita concluída hoje ainda.";
+
+    let txt = "";
+    grupos.forEach((g, gi)=>{
+      if(gi>0) txt += "\n";
+      txt += "Técnico: " + g.tecnico + "\n\n";
+      g.itens.forEach((e,i)=>{
+        const ajud = e.ajudantes ? " (ajudante: " + e.ajudantes + ")" : "";
+        txt += (i+1) + ". " + e.unidade + ajud + "\n" + (e.texto||"(sem descrição)") + "\n\n";
+      });
+    });
+    return txt.trim() + "\n";
+  }
+
+  // ---------- RONDAS ----------
+  function renderRondas(){
+    const todayRondas = state.rondas.filter(r=>isToday(r.criado_em));
+    const doneUnitIds = new Set(todayRondas.map(r=>r.unidade_id));
+
+    let inner;
+    const rondaUnits = unitsForRondas();
+    if(state.rondaTab === "fazer"){
+      const filtroTexto = (state.rondaSearch||"").trim().toLowerCase();
+      const filtradas = filtroTexto ? rondaUnits.filter(u=>
+        u.nome.toLowerCase().includes(filtroTexto) || (u.endereco||"").toLowerCase().includes(filtroTexto)
+      ) : rondaUnits;
+      const cards = filtradas.length ? filtradas.map(u=>{
+        const feita = doneUnitIds.has(u.id);
+        return `
+        <div class="unit-card">
+          <div class="unit-card-top">
+            <div><div class="unit-name">${esc(u.nome)}</div><div class="unit-addr">${esc(u.endereco||"Sem endereço cadastrado")}</div></div>
+          </div>
+          <span class="ronda-badge ${feita?'feito':'pendente'}">${feita?"Feito hoje":"Pendente"}</span>
+          <div class="unit-actions">
+            <button class="btn-sm route" data-action="tirar-foto" data-id="${u.id}">${feita?"Tirar outra foto":"Tirar foto"}</button>
+          </div>
+        </div>`;
+      }).join("") : `<div class="empty-state"><div class="display">${rondaUnits.length?"Nenhuma unidade encontrada":"Nenhuma unidade cadastrada ainda"}</div></div>`;
+      inner = `<div class="grid">${cards}</div>`;
+    }else{
+      const list = todayRondas.slice().sort((a,b)=> new Date(b.criado_em)-new Date(a.criado_em));
+      const rows = list.length ? list.map(r=>{
+        const u = rondaUnits.find(x=>x.id===r.unidade_id);
+        return `
+        <div class="report-card" style="position:relative;">
+          <button data-action="excluir-ronda" data-id="${r.id}" data-foto="${esc(r.foto_path)}" title="Excluir esta foto"
+            style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(20,10,10,.75);color:var(--red);font-size:16px;line-height:1;border:1px solid #5a2a2f;z-index:2;">×</button>
+          <img class="photo-thumb" id="thumb-${r.id}" alt="Foto da ronda" src="" style="border-radius:0;">
+          <div class="report-card-body">
+            <div class="report-top"><span class="report-unit">${esc(u?u.nome:"Unidade removida")}</span></div>
+            <div class="report-meta">${esc(u&&u.endereco?u.endereco:"Sem endereço cadastrado")}</div>
+          </div>
+        </div>`;
+      }).join("") : `<div class="empty-state"><div class="display">Nenhuma ronda registrada hoje ainda</div></div>`;
+      inner = `
+      <div class="report-toolbar">
+        <div></div>
+        <button class="btn-outline" data-action="gerar-pdf-rondas" ${list.length?"":"disabled"}>${state.pdfBusy?"Gerando PDF...":"Gerar PDF do dia"}</button>
+      </div>
+      ${rows}`;
+      setTimeout(()=>{ list.forEach(r=>{ fetchFotoBlobUrl(r.foto_path).then(url=>{ const img=document.getElementById("thumb-"+r.id); if(img && url) img.src=url; }); }); }, 0);
+    }
+
+    return `
+    <div class="controls-row">
+      <div class="tabs">
+        <button class="tab ${state.rondaTab==='fazer'?'active':''}" data-action="ronda-tab" data-tab="fazer">Fazer ronda</button>
+        <button class="tab ${state.rondaTab==='relatorio'?'active':''}" data-action="ronda-tab" data-tab="relatorio">Relatório do dia <span class="cnt">${todayRondas.length}</span></button>
+      </div>
+      ${state.rondaTab==="fazer" ? `<div class="spacer-flex"></div><input id="ronda-search-input" class="search-input" type="text" placeholder="Buscar unidade..." value="${esc(state.rondaSearch||"")}">` : ""}
+    </div>
+    ${inner}`;
+  }
+
+  async function gerarPdfRondas(){
+    const todayRondas = state.rondas.filter(r=>isToday(r.criado_em)).slice().sort((a,b)=> new Date(a.criado_em)-new Date(b.criado_em));
+    if(!todayRondas.length) return;
+    state.pdfBusy = true; rerender();
+    try{
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({unit:"pt", format:"a4"});
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 30;
+      const cols = 2, rows = 2, perPage = cols*rows;
+      const gapX = 16, gapY = 24;
+      const cellW = (pageW - margin*2 - gapX*(cols-1)) / cols;
+      const cellH = (pageH - margin*2 - gapY*(rows-1)) / rows;
+      const rondaUnits = unitsForRondas();
+
+      for(let i=0;i<todayRondas.length;i++){
+        const r = todayRondas[i];
+        const posNaPagina = i % perPage;
+        if(i>0 && posNaPagina===0) doc.addPage();
+        const col = posNaPagina % cols;
+        const row = Math.floor(posNaPagina / cols);
+        const x = margin + col*(cellW+gapX);
+        const y = margin + row*(cellH+gapY);
+
+        const u = rondaUnits.find(x2=>x2.id===r.unidade_id);
+        doc.setFontSize(11);
+        doc.setTextColor(0);
+        doc.text(u ? u.nome : "Unidade removida", x, y+12, {maxWidth:cellW});
+        doc.setFontSize(8);
+        doc.setTextColor(120);
+        doc.text(u && u.endereco ? u.endereco : "Sem endereço cadastrado", x, y+24, {maxWidth:cellW});
+        doc.setTextColor(0);
+
+        const dataUrl = await fetchFotoBase64(r.foto_path);
+        if(dataUrl){
+          const imgY = y + 32;
+          const imgH = cellH - 36;
+          doc.addImage(dataUrl, "JPEG", x, imgY, cellW, imgH);
+        }
+      }
+      doc.save("relatorio-rondas-" + new Date().toISOString().slice(0,10) + ".pdf");
+    }catch(e){
+      state.banner = "Não foi possível gerar o PDF: " + e.message;
+    }
+    state.pdfBusy = false;
+    rerender();
+  }
+
+  // ---------- USUÁRIOS ----------
+  // ---------- RH (presença) ----------
+  // ---------- ORDENS DE SERVIÇO (admin) ----------
+  function formatMesLabel(m){
+    const [y,mo] = m.split("-");
+    const d = new Date(parseInt(y,10), parseInt(mo,10)-1, 1);
+    return d.toLocaleDateString("pt-BR",{month:"long", year:"numeric"});
+  }
+  function renderOrdens(){
+    const porMes = {};
+    state.osList.forEach(os=>{
+      const mes = os.criado_em.slice(0,7);
+      (porMes[mes] = porMes[mes]||[]).push(os);
+    });
+    const meses = Object.keys(porMes).sort().reverse();
+    if(!state.osMonthFilter || !porMes[state.osMonthFilter]){
+      state.osMonthFilter = meses.length ? meses[0] : todayDateStr().slice(0,7);
+    }
+    const mesAtual = state.osMonthFilter;
+    const doMes = (porMes[mesAtual]||[]).slice().sort((a,b)=> new Date(b.criado_em)-new Date(a.criado_em));
+
+    const porDia = {};
+    doMes.forEach(os=>{
+      const dia = os.criado_em.slice(0,10);
+      (porDia[dia] = porDia[dia]||[]).push(os);
+    });
+    const dias = Object.keys(porDia).sort().reverse();
+
+    const diasHtml = dias.length ? dias.map(dia=>{
+      const itens = porDia[dia].map(os=>{
+        const u = state.units.find(x=>x.id===os.unidade_id);
+        return `
+        <div class="report-row">
+          <div class="report-top"><span class="report-unit">${esc(u?u.nome:"Unidade removida")}</span><span class="report-meta">${fmtDate(os.criado_em)}</span></div>
+          <div class="report-tech">${esc(os.tecnico_nome||"—")} · Responsável: ${esc(os.responsavel_nome||"—")}</div>
+          <div class="report-text">${esc(os.servico_texto||"(sem descrição)")}</div>
+          <div class="unit-actions" style="margin-top:8px;max-width:200px;"><button class="btn-sm route" data-action="baixar-pdf-os" data-id="${os.id}">Baixar / Enviar PDF</button></div>
+        </div>`;
+      }).join("");
+      const dataFmt = new Date(dia+"T00:00:00").toLocaleDateString("pt-BR",{weekday:"long", day:"2-digit", month:"long"});
+      return `<h3 style="font-size:13px;color:var(--text-dim);text-transform:capitalize;margin:18px 0 8px;">${dataFmt}</h3>${itens}`;
+    }).join("") : `<div class="empty-state"><div class="display">Nenhuma OS registrada neste mês</div></div>`;
+
+    return `
+    <div class="controls-row">
+      <select id="os-mes-select" style="max-width:220px;">
+        ${meses.length ? meses.map(m=>`<option value="${m}" ${m===mesAtual?"selected":""}>${formatMesLabel(m)}</option>`).join("") : `<option>${formatMesLabel(mesAtual)}</option>`}
+      </select>
+      <div class="spacer-flex"></div>
+      <div style="font-size:12px;color:var(--text-faint);">${doMes.length} OS neste mês</div>
+    </div>
+    ${diasHtml}`;
+  }
+
+  // ---------- ONLINE (admin) ----------
+  function renderOnline(){
+    const agora = Date.now();
+    const linhas = state.usersList.length ? state.usersList.map(p=>{
+      const pres = state.onlineList.find(x=>x.pessoa_id===p.id);
+      const online = pres && pres.last_seen && (agora - new Date(pres.last_seen).getTime()) < 90000;
+      const temLoc = pres && pres.lat!=null && pres.lng!=null;
+      return `
+      <div class="user-row">
+        <div class="user-info">
+          <div class="u-name">${esc(p.nome)} <span class="ronda-badge ${online?'feito':'pendente'}">${online?'Online':'Offline'}</span></div>
+          <div class="u-email">${pres&&pres.last_seen?('Visto '+fmtDate(pres.last_seen)):'Nunca visto no app'}</div>
+          ${temLoc?`<div class="u-email">📍 Última localização: ${fmtDate(pres.loc_atualizada_em)}</div>`:""}
+        </div>
+        <div class="unit-actions" style="max-width:300px;flex-wrap:wrap;">
+          ${temLoc?`<a class="btn-sm" href="https://www.google.com/maps?q=${pres.lat},${pres.lng}" target="_blank" style="text-decoration:none;text-align:center;">Ver no mapa</a>`:""}
+          <button class="btn-sm route" data-action="puxar-localizacao" data-id="${p.id}" data-nome="${esc(p.nome)}">📍 Puxar localização</button>
+        </div>
+      </div>`;
+    }).join("") : `<div class="empty-state"><div class="display">Nenhum usuário cadastrado</div></div>`;
+
+    return `
+    <div style="font-size:12px;color:var(--text-faint);margin-bottom:12px;">Atualiza sozinho a cada poucos segundos. "Online" = app aberto nos últimos 90 segundos.</div>
+    ${linhas}`;
+  }
+
+  function renderRH(){
+    const presMap = {};
+    state.presencas.forEach(p=>{ presMap[p.pessoa_id] = p.status; });
+    const pessoas = state.usersList;
+
+    const rows = pessoas.length ? pessoas.map(p=>{
+      const st = presMap[p.id];
+      return `
+      <div class="user-row">
+        <div class="user-info">
+          <div class="u-name">${esc(p.nome)}</div>
+          <div class="user-tags">
+            ${p.role==="admin" ? `<span class="user-tag admin">Administrador</span>` : (p.areas||[]).map(a=>`<span class="user-tag">${areaLabel(a)}</span>`).join("")}
+          </div>
+        </div>
+        <div class="unit-actions" style="max-width:260px;">
+          <button class="btn-sm" style="${st==='presente'?'background:#123d2e;color:var(--green);border-color:#1e5a44;':''}" data-action="marcar-presenca" data-id="${p.id}" data-status="presente">Presente</button>
+          <button class="btn-sm" style="${st==='falta'?'background:#3d1418;color:var(--red);border-color:#5a2a2f;':''}" data-action="marcar-presenca" data-id="${p.id}" data-status="falta">Faltou</button>
+        </div>
+      </div>`;
+    }).join("") : `<div class="empty-state"><div class="display">Nenhum usuário cadastrado ainda</div></div>`;
+
+    const presentes = Object.values(presMap).filter(s=>s==="presente").length;
+    const faltas = Object.values(presMap).filter(s=>s==="falta").length;
+
+    return `
+    <div class="summary-row" style="grid-template-columns:repeat(3,1fr);">
+      <div class="summary-card"><div class="summary-num">${pessoas.length}</div><div class="summary-label">Equipe</div></div>
+      <div class="summary-card"><div class="summary-num" style="color:var(--green)">${presentes}</div><div class="summary-label">Presentes hoje</div></div>
+      <div class="summary-card"><div class="summary-num" style="color:var(--red)">${faltas}</div><div class="summary-label">Faltas hoje</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--text-faint);margin:-6px 0 12px;">${new Date().toLocaleDateString("pt-BR",{weekday:"long", day:"2-digit", month:"long"})}</div>
+    <div class="controls-row"><div class="spacer-flex"></div><button class="btn-outline" data-action="copy-presenca" ${pessoas.length?"":"disabled"}>Copiar presença do dia</button></div>
+    ${rows}`;
+  }
+
+  function renderUsuarios(){
+    const rows = state.usersList.length ? state.usersList.map(p=>`
+      <div class="user-row">
+        <div class="user-info">
+          <div class="u-name">${esc(p.nome)} ${p.ativo===false?'<span class="user-tag" style="background:#3d1418;color:var(--red);">BLOQUEADO</span>':''}</div>
+          <div class="u-email">${esc(p.email||"e-mail não registrado")}</div>
+          <div class="user-tags">
+            ${p.role==="admin" ? `<span class="user-tag admin">Administrador</span>` : (p.areas||[]).map(a=>`<span class="user-tag">${areaLabel(a)}</span>`).join("")}
+            ${p.role!=="admin" && (!p.areas || !p.areas.length) ? `<span class="user-tag">sem acesso definido</span>` : ""}
+          </div>
+        </div>
+        <div class="unit-actions" style="max-width:320px;">
+          <button class="btn-sm" data-action="edit-user" data-id="${p.id}">Editar</button>
+          <button class="btn-sm" data-action="toggle-user-ativo" data-id="${p.id}" data-val="${p.ativo===false?'1':'0'}">${p.ativo===false?'Desbloquear':'Bloquear'}</button>
+          <button class="btn-sm" style="color:var(--red);" data-action="remove-user" data-id="${p.id}">Remover acesso</button>
+        </div>
+      </div>`).join("") : `<div class="empty-state"><div class="display">Nenhum usuário carregado</div></div>`;
+
+    return `
+    <div class="panel-box">
+      <h3>Bloqueio geral</h3>
+      <div class="checkbox-row"><input type="checkbox" id="block-tecnica" ${state.appSettings.tecnica_bloqueada?'checked':''} data-action-change="toggle-bloqueio-tecnica"><label for="block-tecnica">Bloquear acesso de toda a área Técnica agora</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="block-rondas" ${state.appSettings.rondas_bloqueada?'checked':''} data-action-change="toggle-bloqueio-rondas"><label for="block-rondas">Bloquear acesso de toda a área Rondas agora</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="block-rh" ${state.appSettings.rh_bloqueada?'checked':''} data-action-change="toggle-bloqueio-rh"><label for="block-rh">Bloquear acesso de toda a área RH agora</label></div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:6px;">Não afeta administradores. Efeito imediato, mesmo em quem já está com o app aberto.</div>
+    </div>
+    <div class="panel-box">
+      <h3>Dados da empresa</h3>
+      <div class="field-gap"><label>Nome da empresa</label><input id="empresa-nome" type="text" placeholder="Nome que aparece na Ordem de Serviço" value="${esc(state.empresaNomeDraft!==null?state.empresaNomeDraft:(state.appSettings.empresa_nome||''))}"></div>
+      <div class="field-gap"><label>Endereço base (de onde os técnicos saem)</label><input id="base-endereco" type="text" placeholder="Endereço da empresa" value="${esc(state.baseEnderecoDraft!==null?state.baseEnderecoDraft:(state.appSettings.endereco_base||''))}"></div>
+      <button class="btn-mini" data-action="salvar-base">Salvar dados da empresa</button>
+    </div>
+    <div class="controls-row"><div class="spacer-flex"></div><button class="btn-add" data-action="new-user">+ Novo usuário</button></div>
+    ${rows}
+    <div class="panel-box" style="margin-top:16px;">
+      <h3>Sobre esta área</h3>
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.6;">
+        Ao criar um usuário aqui, é gerado o login dele no Supabase. Se o projeto exigir confirmação de e-mail,
+        confirme manualmente em Authentication → Users antes que a pessoa consiga entrar. Redefinir senha também
+        é feito por lá ("Reset password"). Remover acesso aqui tira a pessoa do app, mas o login continua existindo
+        no Supabase até ser apagado por lá. "Bloquear" é reversível e não apaga nada — só suspende o acesso.
+      </div>
+    </div>`;
+  }
+  function areaLabel(a){
+    return {tecnica:"Técnica", rondas:"Rondas", rh:"RH"}[a] || a;
+  }
+  function renderModal(){
+    if(state.modal.kind === "atribuir"){
+      const m = state.modal;
+      const u = state.units.find(x=>x.id===m.unitId);
+      const excluirId = m.modoApoio ? state.profile.id : null;
+      const tecnicos = state.usersList.filter(p=> p.role!=="admin" && (p.areas||[]).includes("tecnica") && p.id!==excluirId);
+      return `
+      <div class="modal-overlay" data-action="modal-overlay">
+        <div class="modal-box" data-stop="1">
+          <div class="modal-title">${m.modoApoio ? "Pedir apoio" : "Enviar unidade para técnico(s)"}</div>
+          <p style="font-size:12.5px;color:var(--text-dim);margin:-8px 0 12px;">${esc(u?u.nome:"")}${u&&u.assigned_to_nome?(" — atualmente com "+u.assigned_to_nome):""}</p>
+          ${m.modoApoio ? `<p style="font-size:12px;color:var(--text-dim);margin:-6px 0 10px;">Escolha quem convidar pra vir ajudar. Você continua responsável pela unidade — quem aceitar primeiro entra como apoio.</p>` : `<p style="font-size:12px;color:var(--text-dim);margin:-6px 0 10px;">Marque um ou mais técnicos. Se marcar só um, a unidade já vai direto pra ele. Se marcar vários, ela fica disponível pra quem assumir primeiro.</p>`}
+          ${tecnicos.length ? tecnicos.map(tc=>`
+            <div class="checkbox-row"><input type="checkbox" id="conv-${tc.id}" value="${tc.id}" data-nome="${esc(tc.nome)}" class="convite-check"><label for="conv-${tc.id}">${esc(tc.nome)}</label></div>
+          `).join("") : `<div class="no-hist">Nenhum técnico disponível.</div>`}
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button>
+            <button type="button" class="btn-primary" style="width:auto;" data-action="${m.modoApoio?'confirmar-apoio':'confirmar-convite'}" data-unidade="${u?u.id:''}">${m.modoApoio?'Pedir apoio':'Enviar'}</button>
+          </div>
+        </div>
+      </div>`;
+    }
+    if(state.modal.kind === "prioridade"){
+      const m = state.modal;
+      const u = state.units.find(x=>x.id===m.unitId);
+      const opcoes = [
+        {v:"normal", label:"Normal (sem prioridade)"},
+        {v:"urgente", label:"🔴 Urgente"},
+        {v:"aguardar", label:"🟡 Aguardar"},
+        {v:"obras", label:"🟡 Cliente em obras (aguardar)"}
+      ];
+      return `
+      <div class="modal-overlay" data-action="modal-overlay">
+        <div class="modal-box" data-stop="1">
+          <div class="modal-title">Prioridade — ${esc(u?u.nome:"")}</div>
+          ${opcoes.map(o=>`<button type="button" class="btn-outline" style="width:100%;text-align:left;margin-bottom:8px;${u&&(u.prioridade||'normal')===o.v?'border-color:var(--amber);color:var(--amber);':''}" data-action="confirmar-prioridade" data-id="${u?u.id:''}" data-val="${o.v}">${o.label}</button>`).join("")}
+          <div class="modal-actions"><button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button></div>
+        </div>
+      </div>`;
+    }
+    if(state.modal.kind === "import"){
+      const m = state.modal;
+      if(m.step === "input"){
+        return `
+        <div class="modal-overlay" data-action="modal-overlay">
+          <div class="modal-box" data-stop="1">
+            <div class="modal-title">Importar unidades em massa</div>
+            <p style="font-size:12.5px;color:var(--text-dim);margin:-8px 0 10px;">Uma unidade por linha, sempre 3 parênteses: (nome) (endereço) (câmeras). Exemplo: (Abrão Salomão) (Rua Padre Vieira de Meneses, nº 2) (Câmera 1 a 8)</p>
+            <textarea id="import-texto" style="min-height:220px;font-family:'JetBrains Mono',monospace;font-size:12.5px;" placeholder="(Nome da unidade) (Endereço) (Câmera 1 a 8)">${esc(m.texto||"")}</textarea>
+            <div class="modal-actions">
+              <button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button>
+              <button type="button" class="btn-primary" style="width:auto;" data-action="import-analisar">Analisar texto</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if(m.step === "preview"){
+        const validos = m.parsed.filter(p=>!p.erro);
+        const invalidos = m.parsed.filter(p=>p.erro);
+        const itensHtml = m.parsed.map(p=> p.erro
+          ? `<div class="hist-entry"><div class="hist-date">Linha ${p.linha} — <span style="color:var(--red);">${esc(p.erro)}</span></div><div class="hist-text mono" style="color:var(--text-faint);">${esc(p.bruto)}</div></div>`
+          : `<div class="hist-entry"><div class="hist-date">Linha ${p.linha}</div><div class="hist-text"><b>${esc(p.nome)}</b> — ${esc(p.endereco||"sem endereço")} — ${p.qtdCameras} câmera(s)</div></div>`
+        ).join("");
+        return `
+        <div class="modal-overlay" data-action="modal-overlay">
+          <div class="modal-box" data-stop="1">
+            <div class="modal-title">Prévia da importação</div>
+            <p style="font-size:12.5px;color:var(--text-dim);margin:-8px 0 10px;">${validos.length} unidade(s) prontas para criar${invalidos.length?(", " + invalidos.length + " linha(s) com problema (não serão criadas)"):""}.</p>
+            <div style="max-height:340px;overflow-y:auto;">${itensHtml}</div>
+            <div class="modal-actions">
+              <button type="button" class="btn-cancel" data-action="import-voltar">Voltar e editar</button>
+              <button type="button" class="btn-primary" style="width:auto;" data-action="import-criar" ${validos.length?"":"disabled"}>Criar ${validos.length} unidade(s)</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if(m.step === "creating"){
+        return `
+        <div class="modal-overlay">
+          <div class="modal-box" data-stop="1">
+            <div class="modal-title">Criando unidades...</div>
+            <p style="font-size:13.5px;color:var(--text-dim);">${esc(m.progress||"")}</p>
+          </div>
+        </div>`;
+      }
+      if(m.step === "done"){
+        return `
+        <div class="modal-overlay" data-action="modal-overlay">
+          <div class="modal-box" data-stop="1">
+            <div class="modal-title">Importação concluída</div>
+            <p style="font-size:13.5px;color:var(--text-dim);">${esc(m.progress||"")}</p>
+            <div class="modal-actions">
+              <button type="button" class="btn-primary" style="width:auto;" data-action="close-modal">Fechar</button>
+            </div>
+          </div>
+        </div>`;
+      }
+    }
+    if(state.modal.kind === "textview"){
+      return `
+      <div class="modal-overlay" data-action="modal-overlay">
+        <div class="modal-box" data-stop="1">
+          <div class="modal-title">${esc(state.modal.title)}</div>
+          <p style="font-size:12.5px;color:var(--text-dim);margin:-8px 0 10px;">O texto já está selecionado — toque em "Copiar" no menu que aparecer, ou selecione manualmente.</p>
+          <textarea id="report-textarea" readonly style="min-height:260px;font-family:'JetBrains Mono',monospace;font-size:12.5px;">${esc(state.modal.text)}</textarea>
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" data-action="close-modal">Fechar</button>
+            <button type="button" class="btn-primary" style="width:auto;" data-action="reselect-report">Selecionar tudo de novo</button>
+          </div>
+        </div>
+      </div>`;
+    }
+    if(state.modal.kind === "user"){
+      const d = state.modal.draft;
+      const isNew = state.modal.mode === "add";
+      return `
+      <div class="modal-overlay" data-action="modal-overlay">
+        <div class="modal-box" data-stop="1">
+          <div class="modal-title">${isNew?"Novo usuário":"Editar usuário"}</div>
+          <form id="user-form">
+            <div class="field-gap"><label>Nome</label><input id="u-nome" type="text" value="${esc(d.nome)}" required></div>
+            <div class="field-gap"><label>E-mail</label><input id="u-email" type="email" value="${esc(d.email)}" ${isNew?"required":"readonly style='opacity:.6;'"}></div>
+            ${isNew ? `<div class="field-gap"><label>Senha temporária</label><input id="u-senha" type="text" placeholder="mínimo 8 caracteres" required></div>` : ""}
+            <div class="field-gap">
+              <label>Permissões</label>
+              <div class="checkbox-row"><input type="checkbox" id="u-admin" ${d.role==='admin'?'checked':''}><label for="u-admin">É administrador (acesso total)</label></div>
+              <div class="checkbox-row"><input type="checkbox" id="u-area-tecnica" ${(d.areas||[]).includes('tecnica')?'checked':''}><label for="u-area-tecnica">Área Técnica (unidades/manutenção)</label></div>
+              <div class="checkbox-row"><input type="checkbox" id="u-area-rondas" ${(d.areas||[]).includes('rondas')?'checked':''}><label for="u-area-rondas">Rondas</label></div>
+              <div class="checkbox-row"><input type="checkbox" id="u-area-rh" ${(d.areas||[]).includes('rh')?'checked':''}><label for="u-area-rh">RH (presença da equipe)</label></div>
+            </div>
+          </form>
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button>
+            <button type="button" class="btn-primary" style="width:auto;" data-action="save-user">Salvar</button>
+          </div>
+        </div>
+      </div>`;
+    }
+    if(state.modal.kind === "assinatura"){
+      const m = state.modal;
+      const u = state.units.find(x=>x.id===m.unitId);
+      return `
+      <div class="modal-overlay" data-action="modal-overlay">
+        <div class="modal-box" data-stop="1">
+          <div class="modal-title">Ordem de serviço</div>
+          <div class="panel-box" style="margin-bottom:12px;">
+            <div style="font-size:12.5px;color:var(--text-dim);line-height:1.7;">
+              <b style="color:var(--text);">${esc(state.appSettings.empresa_nome||"Empresa")}</b><br>
+              ${esc(state.appSettings.endereco_base||"")}<br><br>
+              <b style="color:var(--text);">Unidade:</b> ${esc(u?u.nome:"")}<br>
+              <b style="color:var(--text);">Endereço:</b> ${esc(u&&u.endereco?u.endereco:"")}<br>
+              <b style="color:var(--text);">Técnico:</b> ${esc(state.profile.nome)}
+            </div>
+          </div>
+          <label>Serviço executado</label>
+          <textarea id="os-servico" style="min-height:80px;" placeholder="Descreva o que foi feito nesta unidade...">${esc(m.servico||"")}</textarea>
+          <div class="field-gap" style="margin-top:10px;"><label>Nome do responsável pela unidade</label><input id="os-responsavel" type="text" value="${esc(m.responsavel||"")}" placeholder="Quem está recebendo o serviço"></div>
+
+          <label style="margin-top:14px;display:block;">Anexos (opcional)</label>
+          <div class="unit-actions" style="margin-bottom:6px;">
+            <button type="button" class="btn-mini" data-action="anexar-foto-os">${m.fotoNome?"Trocar foto":"Anexar foto"}</button>
+            <button type="button" class="btn-mini" data-action="anexar-video-os">${m.videoNome?"Trocar vídeo":"Anexar vídeo"}</button>
+          </div>
+          ${m.fotoNome ? `<div style="font-size:12px;color:var(--text-dim);">📷 ${esc(m.fotoNome)} <button type="button" data-action="remover-anexo-os" data-tipo="foto" style="background:none;color:var(--red);border:none;font-size:12px;">remover</button></div>` : ""}
+          ${m.videoNome ? `<div style="font-size:12px;color:var(--text-dim);">🎬 ${esc(m.videoNome)} <button type="button" data-action="remover-anexo-os" data-tipo="video" style="background:none;color:var(--red);border:none;font-size:12px;">remover</button></div>` : ""}
+
+          <label style="margin-top:14px;display:block;">Assinatura do técnico</label>
+          <canvas id="sig-tecnico" width="500" height="150" style="width:100%;height:120px;background:#fff;border-radius:8px;touch-action:none;display:block;"></canvas>
+          <button type="button" class="btn-mini" style="margin-top:6px;" data-action="limpar-assinatura" data-target="sig-tecnico">Limpar assinatura</button>
+
+          <label style="margin-top:16px;display:block;">Assinatura do responsável pela unidade</label>
+          <canvas id="sig-responsavel" width="500" height="150" style="width:100%;height:120px;background:#fff;border-radius:8px;touch-action:none;display:block;"></canvas>
+          <button type="button" class="btn-mini" style="margin-top:6px;" data-action="limpar-assinatura" data-target="sig-responsavel">Limpar assinatura</button>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button>
+            <button type="button" class="btn-primary" style="width:auto;" data-action="salvar-os" data-id="${u?u.id:''}">Salvar OS assinada</button>
+          </div>
+        </div>
+      </div>`;
+    }
+    if(state.modal.kind === "conclude"){
+      const u = state.units.find(x=>x.id===state.modal.unitId);
+      const stillProblem = u.cameras.some(c=>c.status==="problema");
+      return `
+      <div class="modal-overlay" data-action="modal-overlay">
+        <div class="modal-box" data-stop="1">
+          <div class="modal-title">Concluir visita — ${esc(u.nome)}</div>
+          ${stillProblem ? `<div class="banner">Ainda há câmera(s) marcada(s) como "Problema". Ajuste o status delas acima se já foram resolvidas antes de concluir.</div>` : ""}
+          <label>O que foi feito / observações da manutenção</label>
+          <textarea id="conclude-text" style="min-height:110px;" placeholder="Descreva o serviço realizado nesta unidade...">${esc(state.modal.draftText||"")}</textarea>
+          <div class="field-gap" style="margin-top:12px;"><label>Ajudante(s) (opcional, separe por vírgula)</label><input id="conclude-ajudantes" type="text" value="${esc(state.modal.draftAjudantes||"")}" placeholder="ex: João, Pedro"></div>
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button>
+            <button type="button" class="btn-primary" style="width:auto;" data-action="confirm-conclude" data-id="${u.id}">Concluir e gerar relatório</button>
+          </div>
+        </div>
+      </div>`;
+    }
+    const d = state.modal.draft;
+    const title = state.modal.mode==="add" ? "Nova unidade" : "Editar unidade";
+    return `
+    <div class="modal-overlay" data-action="modal-overlay">
+      <div class="modal-box" data-stop="1">
+        <div class="modal-title">${title}</div>
+        <form id="unit-form">
+          <div class="form-section">
+            <div class="form-section-label">Dados gerais</div>
+            <div class="field-gap"><label>Nome da unidade</label><input id="f-nome" type="text" value="${esc(d.nome)}" required></div>
+            <div class="field-gap"><label>Endereço</label><input id="f-endereco" type="text" value="${esc(d.endereco)}"></div>
+          </div>
+          <div class="form-section">
+            <div class="form-section-label">DVR</div>
+            <div class="form-row field-gap">
+              <div><label>Modelo</label><input id="f-dvr-modelo" type="text" value="${esc(d.dvr_modelo)}"></div>
+              <div><label>IP</label><input id="f-dvr-ip" type="text" class="mono" value="${esc(d.dvr_ip)}"></div>
+            </div>
+            <div class="form-row field-gap">
+              <div><label>Usuário</label><input id="f-dvr-usuario" type="text" value="${esc(d.dvr_usuario)}"></div>
+              <div><label>Senha</label><input id="f-dvr-senha" type="text" value="${esc(d.dvr_senha)}"></div>
+            </div>
+            <div class="field-gap"><label>Portas</label><input id="f-dvr-portas" type="text" value="${esc(d.dvr_portas)}"></div>
+          </div>
+          <div class="form-section">
+            <div class="form-section-label">Central de monitoramento</div>
+            <div class="field-gap"><label>Nome da central</label><input id="f-central-nome" type="text" value="${esc(d.central_nome)}"></div>
+            <div class="form-row field-gap">
+              <div><label>Código do cliente</label><input id="f-central-codigo" type="text" value="${esc(d.central_codigo)}"></div>
+              <div><label>Telefone</label><input id="f-central-telefone" type="text" value="${esc(d.central_telefone)}"></div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button>
+            <button type="submit" class="btn-primary" style="width:auto;">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  }
+
+  // ---------------- EVENTS ----------------
+  function bindEvents(){
+    const app = document.getElementById("app");
+
+    const loginForm = document.getElementById("login-form");
+    if(loginForm) loginForm.addEventListener("submit", async e=>{
+      e.preventDefault();
+      const email = document.getElementById("login-email").value.trim();
+      const pass = document.getElementById("login-pass").value;
+      const btn = document.getElementById("login-submit");
+      btn.disabled = true; btn.textContent = "Entrando...";
+      try{
+        state.session = await loginWithPassword(email, pass);
+        persistSession();
+        const profile = await fetchProfile(state.session.user.id);
+        if(!profile){
+          state.authError = "Sua conta não tem perfil cadastrado. Peça ao administrador.";
+          state.session = null; clearSession();
+          state.screen = "login"; rerender(); return;
+        }
+        if(profile.ativo === false){
+          state.authError = "Seu acesso foi bloqueado pelo administrador.";
+          state.session = null; clearSession();
+          state.screen = "login"; rerender(); return;
+        }
+        state.profile = profile;
+        state.units = await fetchUnits();
+        if(hasArea("rondas")) state.rondas = await fetchRondas();
+      if(hasArea("rondas") && !(isAdmin() || hasArea("tecnica"))) state.rondaUnidadesLimited = await fetchUnidadesParaRondas();
+        state.appSettings = await fetchSettings();
+        state.authError = "";
+        state.view = defaultViewFor();
+        state.screen = "app";
+        inicializarNotificacoes();
+        rerender();
+        startPolling();
+      }catch(err){
+        state.authError = err.message || "Não foi possível entrar.";
+        rerender();
+      }
+    });
+
+    const searchInput = document.getElementById("search-input");
+    if(searchInput) searchInput.addEventListener("input", e=>{ state.search = e.target.value; rerender(); });
+
+    const newCamInput = document.getElementById("new-cam-input");
+    if(newCamInput) newCamInput.addEventListener("input", e=>{ state.newCameraName[state.currentUnitId] = e.target.value; });
+
+    const noteInput = document.getElementById("note-input");
+    if(noteInput) noteInput.addEventListener("input", e=>{ state.noteDraft[state.currentUnitId] = e.target.value; });
+
+    const baseEnderecoInput = document.getElementById("base-endereco");
+    if(baseEnderecoInput) baseEnderecoInput.addEventListener("input", e=>{ state.baseEnderecoDraft = e.target.value; });
+    const empresaNomeInput = document.getElementById("empresa-nome");
+    if(empresaNomeInput) empresaNomeInput.addEventListener("input", e=>{ state.empresaNomeDraft = e.target.value; });
+
+    const rondaSearchInput = document.getElementById("ronda-search-input");
+    if(rondaSearchInput) rondaSearchInput.addEventListener("input", e=>{ state.rondaSearch = e.target.value; rerender(); });
+
+    const importTexto = document.getElementById("import-texto");
+    if(importTexto) importTexto.addEventListener("input", e=>{ state.modal.texto = e.target.value; });
+
+    const concludeText = document.getElementById("conclude-text");
+    if(concludeText) concludeText.addEventListener("input", e=>{ state.modal.draftText = e.target.value; });
+
+    const concludeAjudantes = document.getElementById("conclude-ajudantes");
+    if(concludeAjudantes) concludeAjudantes.addEventListener("input", e=>{ state.modal.draftAjudantes = e.target.value; });
+
+    const osServico = document.getElementById("os-servico");
+    if(osServico) osServico.addEventListener("input", e=>{ state.modal.servico = e.target.value; });
+    const osResponsavel = document.getElementById("os-responsavel");
+    if(osResponsavel) osResponsavel.addEventListener("input", e=>{ state.modal.responsavel = e.target.value; });
+    const sigTecEl = document.getElementById("sig-tecnico");
+    const sigRespEl = document.getElementById("sig-responsavel");
+    setupSignaturePad(sigTecEl);
+    setupSignaturePad(sigRespEl);
+    if(state.modal && state.modal.kind==="assinatura"){
+      if(state.modal.sigTecnicoDataUrl) restaurarAssinatura(sigTecEl, state.modal.sigTecnicoDataUrl);
+      if(state.modal.sigResponsavelDataUrl) restaurarAssinatura(sigRespEl, state.modal.sigResponsavelDataUrl);
+    }
+
+    const unitForm = document.getElementById("unit-form");
+    if(unitForm){
+      const fieldMap = [
+        ["f-nome","nome"],["f-endereco","endereco"],
+        ["f-dvr-modelo","dvr_modelo"],["f-dvr-ip","dvr_ip"],["f-dvr-usuario","dvr_usuario"],["f-dvr-senha","dvr_senha"],["f-dvr-portas","dvr_portas"],
+        ["f-central-nome","central_nome"],["f-central-codigo","central_codigo"],["f-central-telefone","central_telefone"]
+      ];
+      fieldMap.forEach(([id,key])=>{
+        const el = document.getElementById(id);
+        if(el) el.addEventListener("input", ev=>{ state.modal.draft[key] = ev.target.value; });
+      });
+      unitForm.addEventListener("submit", async e=>{
+      e.preventDefault();
+      const d = state.modal.draft;
+      const payload = {
+        nome: document.getElementById("f-nome").value.trim(),
+        endereco: document.getElementById("f-endereco").value.trim(),
+        dvr_modelo: document.getElementById("f-dvr-modelo").value.trim(),
+        dvr_ip: document.getElementById("f-dvr-ip").value.trim(),
+        dvr_usuario: document.getElementById("f-dvr-usuario").value.trim(),
+        dvr_senha: document.getElementById("f-dvr-senha").value.trim(),
+        dvr_portas: document.getElementById("f-dvr-portas").value.trim(),
+        central_nome: document.getElementById("f-central-nome").value.trim(),
+        central_codigo: document.getElementById("f-central-codigo").value.trim(),
+        central_telefone: document.getElementById("f-central-telefone").value.trim(),
+        atualizado_em: new Date().toISOString()
+      };
+      if(!payload.nome) return;
+      if(state.modal.mode==="add"){
+        await apiCreateUnit(payload);
+      }else{
+        await apiUpdateUnit(d.id, payload);
+      }
+      state.modal = null;
+      await refreshUnits();
+      });
+    }
+
+    const reportTa = document.getElementById("report-textarea");
+    if(reportTa){ reportTa.focus(); reportTa.select(); }
+
+    app.addEventListener("click", handleClick);
+    app.addEventListener("change", handleFileChange);
+  }
+
+  async function handleFileChange(e){
+    const tecToggle = e.target.closest("#block-tecnica");
+    if(tecToggle){
+      const val = tecToggle.checked;
+      await apiUpdateSettings({tecnica_bloqueada: val});
+      state.appSettings.tecnica_bloqueada = val;
+      rerender();
+      return;
+    }
+    const rondaToggle = e.target.closest("#block-rondas");
+    if(rondaToggle){
+      const val = rondaToggle.checked;
+      await apiUpdateSettings({rondas_bloqueada: val});
+      state.appSettings.rondas_bloqueada = val;
+      rerender();
+      return;
+    }
+    const rhToggle = e.target.closest("#block-rh");
+    if(rhToggle){
+      const val = rhToggle.checked;
+      await apiUpdateSettings({rh_bloqueada: val});
+      state.appSettings.rh_bloqueada = val;
+      rerender();
+      return;
+    }
+    const osMesSelect = e.target.closest("#os-mes-select");
+    if(osMesSelect){
+      state.osMonthFilter = osMesSelect.value;
+      rerender();
+      return;
+    }
+  }
+
+  async function handleClick(e){
+    const t = e.target.closest("[data-action]");
+    if(!t){
+      if(e.target.closest(".modal-overlay") && !e.target.closest("[data-stop]")){ state.modal=null; rerender(); }
+      return;
+    }
+    const action = t.getAttribute("data-action");
+
+    if(action==="ativar-notificacoes"){
+      if(!("Notification" in window)){
+        state.banner = "Este navegador não suporta notificações.";
+        rerender(); setTimeout(()=>{state.banner="";rerender();},4000);
+        return;
+      }
+      Notification.requestPermission().then(perm=>{
+        state.banner = perm==="granted" ? "Avisos ativados! Enviando um teste..." : "Permissão não concedida. Ative depois nas configurações do navegador, se mudar de ideia.";
+        rerender();
+        if(perm==="granted"){
+          mostrarNotificacao("Avisos ativados ✅", {body:"Esta é uma notificação de teste. Se você a recebeu, está tudo funcionando.", icon:"icon-192.png"});
+        }
+        setTimeout(()=>{state.banner="";rerender();},5000);
+      });
+      return;
+    }
+    if(action==="logout"){
+      clearSession();
+      if(pollTimer) clearInterval(pollTimer);
+      state.session=null; state.profile=null; state.units=[]; state.currentUnitId=null;
+      state.screen="login"; rerender(); return;
+    }
+
+    if(action==="nav"){
+      state.view=t.getAttribute("data-view"); state.currentUnitId=null;
+      rerender();
+      if(state.view==="usuarios"){
+        fetchAllProfiles().then(list=>{ state.usersList = list; rerender(); });
+      }
+      if(state.view==="rondas"){
+        fetchRondas().then(list=>{ state.rondas = list; rerender(); });
+      }
+      if(state.view==="rh"){
+        fetchAllProfiles().then(list=>{ state.usersList = list; rerender(); });
+        fetchPresencasHoje().then(list=>{ state.presencas = list; rerender(); });
+      }
+      if(state.view==="ordens"){
+        fetchOrdensServico().then(list=>{ state.osList = list; rerender(); });
+      }
+      if(state.view==="online"){
+        fetchAllProfiles().then(list=>{ state.usersList = list; rerender(); });
+        fetchPresencaOnline().then(list=>{ state.onlineList = list; rerender(); });
+      }
+      return;
+    }
+    if(action==="ronda-tab"){ state.rondaTab=t.getAttribute("data-tab"); rerender(); return; }
+    if(action==="tirar-foto"){
+      abrirCameraPara(t.getAttribute("data-id"));
+      return;
+    }
+    if(action==="gerar-pdf-rondas"){ await gerarPdfRondas(); return; }
+    if(action==="marcar-presenca"){
+      const id = t.getAttribute("data-id");
+      const status = t.getAttribute("data-status");
+      await apiMarcarPresenca(id, status);
+      state.presencas = await fetchPresencasHoje();
+      rerender();
+      return;
+    }
+    if(action==="atualizar-app"){ window.location.reload(); return; }
+    if(action==="puxar-localizacao"){
+      const id = t.getAttribute("data-id");
+      const nome = t.getAttribute("data-nome");
+      await apiSolicitarLocalizacao(id);
+      state.banner = "Solicitação enviada para " + nome + ". Aguarde alguns segundos...";
+      rerender();
+      setTimeout(async ()=>{
+        state.onlineList = await fetchPresencaOnline();
+        state.banner="";
+        rerender();
+      }, 6000);
+      return;
+    }
+    if(action==="baixar-pdf-os"){
+      const id = t.getAttribute("data-id");
+      const os = state.osList.find(x=>x.id===id) || state.osDaUnidade.find(x=>x.id===id);
+      if(!os) return;
+      const u = state.units.find(x=>x.id===os.unidade_id);
+      const textoOriginal = t.textContent;
+      t.disabled = true; t.textContent = "Gerando...";
+      try{ await compartilharOuBaixarPdfOS(os, u); }catch(e){ alert("Não foi possível gerar o PDF: " + e.message); }
+      t.disabled = false; t.textContent = textoOriginal;
+      return;
+    }
+    if(action==="excluir-ronda"){
+      if(confirm("Excluir esta foto do relatório de hoje? Não pode ser desfeito.")){
+        await apiDeleteRonda(t.getAttribute("data-id"), t.getAttribute("data-foto"));
+        await refreshRondas();
+      }
+      return;
+    }
+
+    if(action==="new-user"){
+      state.modal = {kind:"user", mode:"add", draft:{nome:"",email:"",role:"user",areas:[]}};
+      rerender(); return;
+    }
+    if(action==="edit-user"){
+      const p = state.usersList.find(x=>x.id===t.getAttribute("data-id"));
+      if(p) state.modal = {kind:"user", mode:"edit", draft: JSON.parse(JSON.stringify(p))};
+      rerender(); return;
+    }
+    if(action==="remove-user"){
+      if(confirm("Remover o acesso desta pessoa ao painel? O login continua existindo no Supabase.")){
+        await apiDeleteProfile(t.getAttribute("data-id"));
+        state.usersList = await fetchAllProfiles();
+      }
+      rerender(); return;
+    }
+    if(action==="toggle-user-ativo"){
+      const id = t.getAttribute("data-id");
+      const novoAtivo = t.getAttribute("data-val") === "1";
+      await apiUpdateProfile(id, {ativo: novoAtivo});
+      state.usersList = await fetchAllProfiles();
+      rerender(); return;
+    }
+    if(action==="salvar-base"){
+      const val = (state.baseEnderecoDraft!==null ? state.baseEnderecoDraft : (document.getElementById("base-endereco")?document.getElementById("base-endereco").value:"")).trim();
+      const nomeEmpresa = (state.empresaNomeDraft!==null ? state.empresaNomeDraft : (document.getElementById("empresa-nome")?document.getElementById("empresa-nome").value:"")).trim();
+      await apiUpdateSettings({endereco_base: val, empresa_nome: nomeEmpresa});
+      state.appSettings.endereco_base = val;
+      state.appSettings.empresa_nome = nomeEmpresa;
+      state.baseEnderecoDraft = null;
+      state.empresaNomeDraft = null;
+      state.banner = "Dados da empresa salvos.";
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 3000);
+      return;
+    }
+    if(action==="save-user"){
+      const nome = document.getElementById("u-nome").value.trim();
+      const email = document.getElementById("u-email").value.trim();
+      const senha = document.getElementById("u-senha") ? document.getElementById("u-senha").value : null;
+      const role = document.getElementById("u-admin").checked ? "admin" : "user";
+      const areas = [];
+      if(document.getElementById("u-area-tecnica").checked) areas.push("tecnica");
+      if(document.getElementById("u-area-rondas").checked) areas.push("rondas");
+      if(document.getElementById("u-area-rh").checked) areas.push("rh");
+      if(!nome || !email){ return; }
+      try{
+        if(state.modal.mode==="add"){
+          if(!senha || senha.length<8){ state.banner="A senha temporária precisa ter pelo menos 8 caracteres."; rerender(); setTimeout(()=>{state.banner="";rerender();},4000); return; }
+          const authUser = await apiSignupAuthUser(email, senha);
+          await apiCreateProfile({id: authUser.id, nome, email, role, areas});
+        }else{
+          await apiUpdateProfile(state.modal.draft.id, {nome, role, areas});
+        }
+        state.modal = null;
+        state.usersList = await fetchAllProfiles();
+        rerender();
+      }catch(err){
+        state.banner = err.message || "Não foi possível salvar o usuário.";
+        rerender();
+        setTimeout(()=>{ state.banner=""; rerender(); }, 5000);
+      }
+      return;
+    }
+    if(action==="tec-tab"){ state.tecTab=t.getAttribute("data-tab"); rerender(); return; }
+    if(action==="set-filter"){ state.filter=t.getAttribute("data-filter"); rerender(); return; }
+
+    if(action==="abrir-atribuir"){
+      const id = t.getAttribute("data-id");
+      state.modal = {kind:"atribuir", unitId:id, modoApoio:false};
+      rerender();
+      fetchAllProfiles().then(list=>{ state.usersList = list; rerender(); });
+      return;
+    }
+    if(action==="abrir-pedir-apoio"){
+      const id = t.getAttribute("data-id");
+      state.modal = {kind:"atribuir", unitId:id, modoApoio:true};
+      rerender();
+      fetchAllProfiles().then(list=>{ state.usersList = list; rerender(); });
+      return;
+    }
+    if(action==="confirmar-convite"){
+      const unidadeId = t.getAttribute("data-unidade");
+      const marcados = Array.from(document.querySelectorAll(".convite-check:checked"));
+      if(!marcados.length){ alert("Marque pelo menos um técnico."); return; }
+      const ids = marcados.map(el=>el.value);
+      const nomes = marcados.map(el=>el.getAttribute("data-nome"));
+      if(ids.length===1){
+        await apiUpdateUnit(unidadeId, {assigned_to: ids[0], assigned_at: new Date().toISOString(), tecnicos_convidados: [], atualizado_em: new Date().toISOString()});
+        await apiAddHistorico(unidadeId, "rota", "Unidade atribuída pelo administrador a " + nomes[0] + ".");
+        state.banner = "Unidade enviada para " + nomes[0] + ".";
+      }else{
+        await apiConvidarTecnicos(unidadeId, ids);
+        await apiAddHistorico(unidadeId, "rota", "Unidade oferecida pelo administrador a: " + nomes.join(", ") + ".");
+        state.banner = "Convite enviado para " + ids.length + " técnicos. Quem assumir primeiro fica com ela.";
+      }
+      state.modal = null;
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 4000);
+      await refreshUnits();
+      return;
+    }
+    if(action==="confirmar-apoio"){
+      const unidadeId = t.getAttribute("data-unidade");
+      const marcados = Array.from(document.querySelectorAll(".convite-check:checked"));
+      if(!marcados.length){ alert("Marque pelo menos um técnico."); return; }
+      const ids = marcados.map(el=>el.value);
+      const nomes = marcados.map(el=>el.getAttribute("data-nome"));
+      await apiConvidarTecnicos(unidadeId, ids);
+      await apiAddHistorico(unidadeId, "rota", "Apoio solicitado para: " + nomes.join(", ") + ".");
+      state.modal = null;
+      state.banner = "Pedido de apoio enviado.";
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 4000);
+      await refreshUnits();
+      return;
+    }
+    if(action==="aceitar-apoio"){
+      const id = t.getAttribute("data-id");
+      const ok = await apiAceitarApoio(id, state.profile.id, state.profile.nome);
+      if(!ok){
+        state.banner = "Já tem outro técnico ajudando nessa unidade.";
+      }else{
+        await apiAddHistorico(id, "rota", state.profile.nome + " aceitou o pedido de apoio.");
+        state.banner = "Apoio confirmado!";
+      }
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 4000);
+      await refreshUnits();
+      return;
+    }
+    if(action==="abrir-prioridade"){
+      state.modal = {kind:"prioridade", unitId:t.getAttribute("data-id")};
+      rerender(); return;
+    }
+    if(action==="confirmar-prioridade"){
+      const id = t.getAttribute("data-id");
+      const val = t.getAttribute("data-val");
+      await apiUpdateUnit(id, {prioridade: val, atualizado_em: new Date().toISOString()});
+      state.modal = null;
+      await refreshUnits();
+      return;
+    }
+    if(action==="new-unit"){
+      state.modal={mode:"add", draft:{id:null,nome:"",endereco:"",dvr_modelo:"",dvr_ip:"",dvr_usuario:"",dvr_senha:"",dvr_portas:"",central_nome:"",central_codigo:"",central_telefone:""}};
+      rerender(); return;
+    }
+    if(action==="open-import"){
+      state.modal = {kind:"import", step:"input", texto:"", parsed:[], progress:""};
+      rerender(); return;
+    }
+    if(action==="import-analisar"){
+      const texto = document.getElementById("import-texto").value;
+      state.modal.texto = texto;
+      state.modal.parsed = parseUnidadesTexto(texto);
+      state.modal.step = "preview";
+      rerender(); return;
+    }
+    if(action==="import-voltar"){
+      state.modal.step = "input";
+      rerender(); return;
+    }
+    if(action==="import-criar"){
+      const validos = state.modal.parsed.filter(p=>!p.erro);
+      state.modal.step = "creating";
+      let ok = 0, falhas = 0;
+      for(let i=0;i<validos.length;i++){
+        const item = validos[i];
+        state.modal.progress = "Criando " + (i+1) + " de " + validos.length + ": " + item.nome;
+        rerender();
+        try{
+          const novaUnidade = await apiCreateUnit({
+            nome: item.nome, endereco: item.endereco||"",
+            dvr_modelo:"", dvr_ip:"", dvr_usuario:"", dvr_senha:"", dvr_portas:"",
+            central_nome:"", central_codigo:"", central_telefone:"",
+            atualizado_em: new Date().toISOString()
+          });
+          for(let c=1;c<=item.qtdCameras;c++){
+            await apiAddCamera(novaUnidade.id, "Câmera " + c);
+          }
+          ok++;
+        }catch(err){ falhas++; }
+      }
+      state.modal.progress = ok + " unidade(s) criada(s) com sucesso." + (falhas?(" " + falhas + " falharam."):"");
+      state.modal.step = "done";
+      rerender();
+      await refreshUnits();
+      return;
+    }
+    if(action==="edit-unit"){
+      const u = state.units.find(x=>x.id===t.getAttribute("data-id"));
+      if(u) state.modal={mode:"edit", draft: JSON.parse(JSON.stringify(u))};
+      rerender(); return;
+    }
+    if(action==="reselect-report"){
+      const ta = document.getElementById("report-textarea");
+      if(ta){ ta.focus(); ta.select(); }
+      return;
+    }
+    if(action==="close-modal"){ state.modal=null; rerender(); return; }
+    if(action==="modal-overlay"){ return; }
+
+    if(action==="delete-unit"){
+      if(confirm("Excluir esta unidade e todo o histórico? Não pode ser desfeito.")){
+        await apiDeleteUnit(t.getAttribute("data-id"));
+        state.currentUnitId=null;
+        await refreshUnits();
+      }
+      return;
+    }
+
+    if(action==="open-unit"){
+      state.currentUnitId=t.getAttribute("data-id");
+      rerender();
+      fetchOrdensServicoUnidade(state.currentUnitId).then(list=>{ state.osDaUnidade=list; rerender(); });
+      return;
+    }
+    if(action==="back"){ state.currentUnitId=null; rerender(); return; }
+
+    if(action==="route"){
+      const u = state.units.find(x=>x.id===t.getAttribute("data-id"));
+      if(u) openRouteFor(u);
+      return;
+    }
+    if(action==="compartilhar-localizacao"){
+      const u = state.units.find(x=>x.id===t.getAttribute("data-id"));
+      if(u) compartilharLocalizacao(u);
+      return;
+    }
+    if(action==="plano-rota"){ abrirPlanoDeRota(); return; }
+
+    if(action==="claim"){
+      const id = t.getAttribute("data-id");
+      const ok = await apiClaimUnit(id, state.profile.id);
+      if(!ok){
+        state.banner = "Essa unidade já foi assumida por outro técnico.";
+        setTimeout(()=>{ state.banner=""; rerender(); }, 4000);
+      }else{
+        await apiAddHistorico(id, "rota", "Técnico assumiu a unidade.");
+        state.tecTab = "minhas";
+      }
+      await refreshUnits();
+      return;
+    }
+
+    if(action==="release"){
+      await apiReleaseUnit(t.getAttribute("data-id"));
+      state.currentUnitId=null;
+      await refreshUnits();
+      return;
+    }
+
+    if(action==="open-conclude"){
+      state.modal={kind:"conclude", unitId:t.getAttribute("data-id"), draftText:"", draftAjudantes:""};
+      rerender(); return;
+    }
+    if(action==="abrir-assinatura"){
+      state.modal={kind:"assinatura", unitId:t.getAttribute("data-id"), servico:"", responsavel:""};
+      rerender(); return;
+    }
+    if(action==="limpar-assinatura"){
+      limparAssinatura(document.getElementById(t.getAttribute("data-target")));
+      return;
+    }
+    if(action==="anexar-foto-os"){ osFotoInput.value=""; osFotoInput.click(); return; }
+    if(action==="anexar-video-os"){ osVideoInput.value=""; osVideoInput.click(); return; }
+    if(action==="remover-anexo-os"){
+      const tipo = t.getAttribute("data-tipo");
+      if(tipo==="foto"){ state.modal.fotoFile=null; state.modal.fotoNome=null; }
+      else{ state.modal.videoFile=null; state.modal.videoNome=null; }
+      rerender(); return;
+    }
+    if(action==="salvar-os"){
+      const canvasTec = document.getElementById("sig-tecnico");
+      const canvasResp = document.getElementById("sig-responsavel");
+      if(canvasTec.dataset.assinado!=="1" || canvasResp.dataset.assinado!=="1"){
+        alert("As duas assinaturas (técnico e responsável) são necessárias antes de salvar.");
+        return;
+      }
+      const responsavel = document.getElementById("os-responsavel").value.trim();
+      if(!responsavel){
+        alert("Informe o nome do responsável pela unidade.");
+        return;
+      }
+      const unidadeId = t.getAttribute("data-id");
+      const servico = document.getElementById("os-servico").value.trim();
+      const assinaturaTecnico = canvasTec.toDataURL("image/png");
+      const assinaturaResponsavel = canvasResp.toDataURL("image/png");
+      const salvarBtn = t;
+      salvarBtn.disabled = true;
+      salvarBtn.textContent = "Salvando...";
+      try{
+        let fotoPath = null, videoPath = null;
+        if(state.modal.fotoFile) fotoPath = await apiUploadOsAnexo(state.modal.fotoFile, unidadeId, "foto");
+        if(state.modal.videoFile) videoPath = await apiUploadOsAnexo(state.modal.videoFile, unidadeId, "video");
+        const osSalva = await apiSalvarOS(unidadeId, servico, responsavel, assinaturaTecnico, assinaturaResponsavel, fotoPath, videoPath);
+        state.modal = null;
+        state.banner = "Ordem de serviço salva! Preparando PDF...";
+        rerender();
+        const u = state.units.find(x=>x.id===unidadeId);
+        const resultado = await compartilharOuBaixarPdfOS(osSalva, u);
+        state.banner = resultado==="compartilhado" ? "OS salva e enviada!" : resultado==="baixado" ? "OS salva e PDF baixado! Envie pra quem precisar." : "OS salva!";
+        rerender();
+        setTimeout(()=>{ state.banner=""; rerender(); }, 4500);
+      }catch(err){
+        alert("Não foi possível salvar a OS: " + err.message);
+        salvarBtn.disabled = false;
+        salvarBtn.textContent = "Salvar OS assinada";
+      }
+      return;
+    }
+
+    if(action==="confirm-conclude"){
+      const id = t.getAttribute("data-id");
+      const text = (state.modal.draftText||"").trim() || "Manutenção realizada.";
+      const ajudantes = (state.modal.draftAjudantes||"").trim();
+      await apiAddHistorico(id, "conclusao", text, ajudantes);
+      await apiReleaseUnit(id);
+      state.modal=null;
+      state.currentUnitId=null;
+      await refreshUnits();
+      return;
+    }
+
+    if(action==="cam-status"){
+      const camId = t.getAttribute("data-cam");
+      await apiUpdateCamera(camId, t.getAttribute("data-val"));
+      await refreshUnits();
+      return;
+    }
+    if(action==="cam-remove"){
+      await apiDeleteCamera(t.getAttribute("data-cam"));
+      await refreshUnits();
+      return;
+    }
+    if(action==="add-camera"){
+      const unitId = t.getAttribute("data-id");
+      const name = (state.newCameraName[unitId]||"").trim();
+      if(!name) return;
+      await apiAddCamera(unitId, name);
+      state.newCameraName[unitId] = "";
+      await refreshUnits();
+      return;
+    }
+
+    if(action==="add-nota"){
+      const unitId = t.getAttribute("data-id");
+      const text = (state.noteDraft[unitId]||"").trim();
+      if(!text) return;
+      await apiAddHistorico(unitId, "nota", text);
+      state.noteDraft[unitId] = "";
+      await refreshUnits();
+      return;
+    }
+
+    if(action==="copy-report"){
+      const txt = buildReportText();
+      state.modal = {kind:"textview", title:"Relatório do dia", text: txt};
+      rerender();
+      copyTextToClipboard(txt).then(()=>{
+        state.modal = null;
+        state.banner = "Relatório copiado! Cole onde quiser enviar (WhatsApp, e-mail, etc.).";
+        rerender();
+        setTimeout(()=>{ state.banner=""; rerender(); }, 4000);
+      }).catch(()=>{ /* modal já está aberto com o texto selecionado para copiar manualmente */ });
+      return;
+    }
+    if(action==="copy-presenca"){
+      const txt = buildPresencaText();
+      state.modal = {kind:"textview", title:"Presença do dia", text: txt};
+      rerender();
+      copyTextToClipboard(txt).then(()=>{
+        state.modal = null;
+        state.banner = "Presença copiada! Cole onde quiser enviar (WhatsApp, e-mail, etc.).";
+        rerender();
+        setTimeout(()=>{ state.banner=""; rerender(); }, 4000);
+      }).catch(()=>{ /* modal já está aberto com o texto selecionado para copiar manualmente */ });
+      return;
+    }
+  }
+
+  // Input de câmera único e permanente — nunca é recriado pelos re-renders,
+  // por isso não se perde se o app atualizar a tela no meio de um upload
+  // (ex: tirar foto de uma unidade e, logo em seguida, de outra).
+  const cameraInput = document.createElement("input");
+  cameraInput.type = "file";
+  cameraInput.accept = "image/*";
+  cameraInput.capture = "environment";
+  cameraInput.style.display = "none";
+  document.body.appendChild(cameraInput);
+
+  function abrirCameraPara(unidadeId){
+    cameraInput.value = "";
+    cameraInput.dataset.unidadeId = unidadeId;
+    cameraInput.click();
+  }
+
+  cameraInput.addEventListener("change", async ()=>{
+    const unidadeId = cameraInput.dataset.unidadeId;
+    const file = cameraInput.files && cameraInput.files[0];
+    if(!file || !unidadeId) return;
+    const unidade = state.units.find(u=>u.id===unidadeId) || state.rondaUnidadesLimited.find(u=>u.id===unidadeId);
+    const nomeUnidade = unidade ? unidade.nome : "unidade";
+    state.banner = "Enviando foto de " + nomeUnidade + "...";
+    rerender();
+    try{
+      const path = await apiUploadFoto(file, unidadeId);
+      await apiInsertRonda(unidadeId, path);
+      state.banner = "Foto de " + nomeUnidade + " registrada!";
+      await refreshRondas();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 3000);
+    }catch(err){
+      state.banner = "Não foi possível enviar a foto de " + nomeUnidade + ": " + err.message;
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 8000);
+    }
+  });
+
+  const osFotoInput = document.createElement("input");
+  osFotoInput.type = "file";
+  osFotoInput.accept = "image/*";
+  osFotoInput.style.display = "none";
+  document.body.appendChild(osFotoInput);
+  osFotoInput.addEventListener("change", ()=>{
+    const file = osFotoInput.files && osFotoInput.files[0];
+    if(!file || !state.modal || state.modal.kind!=="assinatura") return;
+    state.modal.fotoFile = file;
+    state.modal.fotoNome = file.name;
+    rerender();
+  });
+
+  const osVideoInput = document.createElement("input");
+  osVideoInput.type = "file";
+  osVideoInput.accept = "video/*";
+  osVideoInput.style.display = "none";
+  document.body.appendChild(osVideoInput);
+  osVideoInput.addEventListener("change", ()=>{
+    const file = osVideoInput.files && osVideoInput.files[0];
+    if(!file || !state.modal || state.modal.kind!=="assinatura") return;
+    state.modal.videoFile = file;
+    state.modal.videoNome = file.name;
+    rerender();
+  });
+
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", ()=>{
+      navigator.serviceWorker.register("sw.js").then(reg=>{
+        reg.addEventListener("updatefound", ()=>{
+          const novo = reg.installing;
+          if(!novo) return;
+          novo.addEventListener("statechange", ()=>{
+            if(novo.state === "activated" && navigator.serviceWorker.controller){
+              state.updateDisponivel = true;
+              rerender();
+            }
+          });
+        });
+      }).catch(()=>{});
+    });
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
