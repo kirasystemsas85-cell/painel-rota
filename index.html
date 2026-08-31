@@ -373,7 +373,7 @@
   }
 
   async function fetchUnits(){
-    const res = await authFetch("/rest/v1/unidades?select=*,cameras(*),historico(*),assigned:profiles(nome)&order=nome.asc");
+    const res = await authFetch("/rest/v1/unidades?select=*,cameras(*),historico(*),assigned:profiles!assigned_to(nome)&order=nome.asc");
     if(!res.ok){
       let detail = "HTTP " + res.status;
       try{ const d = await res.json(); detail = d.message || d.error || JSON.stringify(d); }catch(e){}
