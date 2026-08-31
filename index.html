@@ -227,13 +227,21 @@
 
   let pollTimer = null;
   let notifiedAssignedIds = new Set();
+  let notifiedConviteIds = new Set();
+  let notifiedApoioIds = new Set();
   let notificacoesIniciadas = false;
 
   function inicializarNotificacoes(){
     if(notificacoesIniciadas || !state.profile) return;
     notificacoesIniciadas = true;
     const myId = state.profile.id;
-    state.units.filter(u=>u.assigned_to===myId).forEach(u=>notifiedAssignedIds.add(u.id));
+    state.units.forEach(u=>{
+      if(u.assigned_to===myId){
+        notifiedAssignedIds.add(u.id);
+        if(u.apoio_tecnico_id) notifiedApoioIds.add(u.id+":"+u.apoio_tecnico_id);
+      }
+      if((u.tecnicos_convidados||[]).includes(myId)) notifiedConviteIds.add(u.id);
+    });
   }
 
   function mostrarNotificacao(titulo, opcoes){
@@ -254,8 +262,8 @@
     if(!state.profile || isAdmin()) return;
     if(!("Notification" in window) || Notification.permission!=="granted") return;
     const myId = state.profile.id;
-    state.units.filter(u=>u.assigned_to===myId).forEach(u=>{
-      if(!notifiedAssignedIds.has(u.id)){
+    state.units.forEach(u=>{
+      if(u.assigned_to===myId && !notifiedAssignedIds.has(u.id)){
         notifiedAssignedIds.add(u.id);
         const prioridadeTxt = PRIORIDADE_LABEL[u.prioridade] ? (" — " + PRIORIDADE_LABEL[u.prioridade]) : "";
         mostrarNotificacao("Nova unidade atribuída a você", {
@@ -263,6 +271,27 @@
           icon: "icon-192.png",
           tag: "unidade-"+u.id
         });
+      }
+      if((u.tecnicos_convidados||[]).includes(myId) && !notifiedConviteIds.has(u.id)){
+        notifiedConviteIds.add(u.id);
+        const ehApoio = !!u.assigned_to;
+        const prioridadeTxt = PRIORIDADE_LABEL[u.prioridade] ? (" — " + PRIORIDADE_LABEL[u.prioridade]) : "";
+        mostrarNotificacao(ehApoio ? "Pedido de apoio" : "Nova unidade disponível", {
+          body: u.nome + (ehApoio ? " precisa de apoio" : (" — convite para atender" + prioridadeTxt)),
+          icon: "icon-192.png",
+          tag: "convite-"+u.id
+        });
+      }
+      if(u.assigned_to===myId && u.apoio_tecnico_id){
+        const chave = u.id+":"+u.apoio_tecnico_id;
+        if(!notifiedApoioIds.has(chave)){
+          notifiedApoioIds.add(chave);
+          mostrarNotificacao("Apoio confirmado", {
+            body: (u.apoio_tecnico_nome||"Um técnico") + " vai te ajudar na unidade " + u.nome + ".",
+            icon: "icon-192.png",
+            tag: "apoio-"+u.id
+          });
+        }
       }
     });
   }
@@ -345,7 +374,12 @@
 
   async function fetchUnits(){
     const res = await authFetch("/rest/v1/unidades?select=*,cameras(*),historico(*),assigned:profiles(nome)&order=nome.asc");
-    if(!res.ok) return [];
+    if(!res.ok){
+      let detail = "HTTP " + res.status;
+      try{ const d = await res.json(); detail = d.message || d.error || JSON.stringify(d); }catch(e){}
+      state.banner = "Não foi possível carregar as unidades: " + detail;
+      return [];
+    }
     const data = await res.json();
     data.forEach(u=>{
       u.historico.sort((a,b)=> new Date(b.criado_em)-new Date(a.criado_em));
@@ -370,7 +404,21 @@
   async function apiClaimUnit(id, userId){
     const res = await authFetch("/rest/v1/unidades?id=eq."+id+"&assigned_to=is.null", {
       method:"PATCH", headers:{"Prefer":"return=representation"},
-      body: JSON.stringify({assigned_to:userId, assigned_at:new Date().toISOString()})
+      body: JSON.stringify({assigned_to:userId, assigned_at:new Date().toISOString(), tecnicos_convidados:[]})
+    });
+    const data = await res.json();
+    return data.length>0;
+  }
+  async function apiConvidarTecnicos(unidadeId, idsArray){
+    await authFetch("/rest/v1/unidades?id=eq."+unidadeId, {
+      method:"PATCH",
+      body: JSON.stringify({tecnicos_convidados: idsArray})
+    });
+  }
+  async function apiAceitarApoio(unidadeId, userId, nome){
+    const res = await authFetch("/rest/v1/unidades?id=eq."+unidadeId+"&apoio_tecnico_id=is.null", {
+      method:"PATCH", headers:{"Prefer":"return=representation"},
+      body: JSON.stringify({apoio_tecnico_id:userId, apoio_tecnico_nome:nome, apoio_aceito_em:new Date().toISOString(), tecnicos_convidados:[]})
     });
     const data = await res.json();
     return data.length>0;
@@ -1055,13 +1103,19 @@
   // ---------- TECHNICIAN VIEW ----------
   function renderTecUnidades(){
     const myId = state.profile.id;
-    const fila = state.units.filter(u=> getStatus(u)==="problema" && !u.assigned_to);
+    const fila = state.units.filter(u=> !u.assigned_to && (getStatus(u)==="problema" || (u.tecnicos_convidados||[]).includes(myId)));
     const minhas = state.units.filter(u=> u.assigned_to === myId);
-    const list = state.tecTab==="fila" ? fila : minhas;
+    const apoio = state.units.filter(u=> u.assigned_to && u.assigned_to!==myId && !u.apoio_tecnico_id && (u.tecnicos_convidados||[]).includes(myId));
+    const list = state.tecTab==="fila" ? fila : state.tecTab==="apoio" ? apoio : minhas;
 
     const cards = list.length ? list.map(u=>{
       const st = getStatus(u);
       const probCams = u.cameras.filter(c=>c.status==="problema").length;
+      const convidado = (u.tecnicos_convidados||[]).includes(myId);
+      let botaoPrincipal;
+      if(state.tecTab==="fila") botaoPrincipal = `<button class="btn-sm route" data-action="claim" data-id="${u.id}">Assumir</button>`;
+      else if(state.tecTab==="apoio") botaoPrincipal = `<button class="btn-sm route" data-action="aceitar-apoio" data-id="${u.id}">Aceitar apoio</button>`;
+      else botaoPrincipal = `<button class="btn-sm route" data-action="route" data-id="${u.id}">Ir / Rota</button>`;
       return `
       <div class="unit-card st-${st}">
         <div class="unit-card-top">
@@ -1070,22 +1124,23 @@
         </div>
         <span class="status-pill ${st}">${STATUS_LABEL[st]}</span>
         ${prioridadeBadge(u)}
+        ${convidado && state.tecTab!=="minhas" ? `<span class="assigned-pill">Convite</span>` : ""}
+        ${state.tecTab==="apoio" ? `<span class="assigned-pill">Com: ${esc(u.assigned_to_nome||"—")}</span>` : ""}
         <div class="unit-meta">${u.cameras.length} câmera(s)${probCams?` · ${probCams} com problema`:""}</div>
         <div class="unit-actions">
           <button class="btn-sm" data-action="open-unit" data-id="${u.id}">Ver detalhes</button>
-          ${state.tecTab==="fila"
-            ? `<button class="btn-sm route" data-action="claim" data-id="${u.id}">Assumir</button>`
-            : `<button class="btn-sm route" data-action="route" data-id="${u.id}">Ir / Rota</button>`}
+          ${botaoPrincipal}
         </div>
         ${state.tecTab==="minhas" ? `<div class="unit-actions"><button class="btn-sm" data-action="compartilhar-localizacao" data-id="${u.id}">📍 Compartilhar localização</button></div>` : ""}
       </div>`;
-    }).join("") : `<div class="empty-state"><div class="display">${state.tecTab==="fila"?"Nenhuma unidade com problema no momento":"Você não está atendendo nenhuma unidade agora"}</div></div>`;
+    }).join("") : `<div class="empty-state"><div class="display">${state.tecTab==="fila"?"Nenhuma unidade com problema ou convite no momento":state.tecTab==="apoio"?"Nenhum pedido de apoio no momento":"Você não está atendendo nenhuma unidade agora"}</div></div>`;
 
     return `
     <div class="controls-row">
       <div class="tabs">
         <button class="tab ${state.tecTab==='fila'?'active':''}" data-action="tec-tab" data-tab="fila">Fila de problemas <span class="cnt">${fila.length}</span></button>
         <button class="tab ${state.tecTab==='minhas'?'active':''}" data-action="tec-tab" data-tab="minhas">Minhas unidades <span class="cnt">${minhas.length}</span></button>
+        <button class="tab ${state.tecTab==='apoio'?'active':''}" data-action="tec-tab" data-tab="apoio">Pedidos de apoio <span class="cnt">${apoio.length}</span></button>
       </div>
       <div class="spacer-flex"></div>
       ${state.tecTab==="minhas" && minhas.length ? `<button class="btn-add" data-action="plano-rota">Plano de rota (${minhas.length})</button>` : ""}
@@ -1191,6 +1246,7 @@
         actions += `<button class="btn-outline" data-action="claim" data-id="${u.id}">Assumir unidade</button>`;
       }else if(mine){
         actions += `<button class="btn-outline" data-action="compartilhar-localizacao" data-id="${u.id}">📍 Compartilhar localização</button>`;
+        actions += `<button class="btn-outline" data-action="abrir-pedir-apoio" data-id="${u.id}">Pedir apoio</button>`;
         actions += `<button class="btn-outline" data-action="release" data-id="${u.id}">Liberar</button>`;
         actions += `<button class="btn-outline" data-action="abrir-assinatura" data-id="${u.id}">Assinar OS</button>`;
         actions += `<button class="btn-add" data-action="open-conclude" data-id="${u.id}">Concluir visita</button>`;
@@ -1209,6 +1265,7 @@
         <span class="status-pill ${st}" style="margin-top:8px;display:inline-block;">${STATUS_LABEL[st]}</span>
         ${u.prioridade && u.prioridade!=="normal" ? `<span style="margin-left:6px;">${prioridadeBadge(u)}</span>` : ""}
         ${u.assigned_to_nome ? `<span class="assigned-pill" style="margin-left:6px;">Com: ${esc(u.assigned_to_nome)}</span>` : ""}
+        ${u.apoio_tecnico_nome ? `<span class="assigned-pill" style="margin-left:6px;">Apoio: ${esc(u.apoio_tecnico_nome)}</span>` : ""}
       </div>
       <div class="detail-actions">${actions}</div>
     </div>
@@ -1593,14 +1650,21 @@
     if(state.modal.kind === "atribuir"){
       const m = state.modal;
       const u = state.units.find(x=>x.id===m.unitId);
-      const tecnicos = state.usersList.filter(p=> p.role!=="admin" && (p.areas||[]).includes("tecnica"));
+      const excluirId = m.modoApoio ? state.profile.id : null;
+      const tecnicos = state.usersList.filter(p=> p.role!=="admin" && (p.areas||[]).includes("tecnica") && p.id!==excluirId);
       return `
       <div class="modal-overlay" data-action="modal-overlay">
         <div class="modal-box" data-stop="1">
-          <div class="modal-title">Enviar unidade para técnico</div>
+          <div class="modal-title">${m.modoApoio ? "Pedir apoio" : "Enviar unidade para técnico(s)"}</div>
           <p style="font-size:12.5px;color:var(--text-dim);margin:-8px 0 12px;">${esc(u?u.nome:"")}${u&&u.assigned_to_nome?(" — atualmente com "+u.assigned_to_nome):""}</p>
-          ${tecnicos.length ? tecnicos.map(tc=>`<button type="button" class="btn-outline" style="width:100%;text-align:left;margin-bottom:8px;" data-action="confirmar-atribuir" data-unidade="${u?u.id:''}" data-tecnico="${tc.id}" data-nome="${esc(tc.nome)}">${esc(tc.nome)}</button>`).join("") : `<div class="no-hist">Nenhum técnico cadastrado na área Técnica ainda.</div>`}
-          <div class="modal-actions"><button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button></div>
+          ${m.modoApoio ? `<p style="font-size:12px;color:var(--text-dim);margin:-6px 0 10px;">Escolha quem convidar pra vir ajudar. Você continua responsável pela unidade — quem aceitar primeiro entra como apoio.</p>` : `<p style="font-size:12px;color:var(--text-dim);margin:-6px 0 10px;">Marque um ou mais técnicos. Se marcar só um, a unidade já vai direto pra ele. Se marcar vários, ela fica disponível pra quem assumir primeiro.</p>`}
+          ${tecnicos.length ? tecnicos.map(tc=>`
+            <div class="checkbox-row"><input type="checkbox" id="conv-${tc.id}" value="${tc.id}" data-nome="${esc(tc.nome)}" class="convite-check"><label for="conv-${tc.id}">${esc(tc.nome)}</label></div>
+          `).join("") : `<div class="no-hist">Nenhum técnico disponível.</div>`}
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" data-action="close-modal">Cancelar</button>
+            <button type="button" class="btn-primary" style="width:auto;" data-action="${m.modoApoio?'confirmar-apoio':'confirmar-convite'}" data-unidade="${u?u.id:''}">${m.modoApoio?'Pedir apoio':'Enviar'}</button>
+          </div>
         </div>
       </div>`;
     }
@@ -2150,21 +2214,65 @@
 
     if(action==="abrir-atribuir"){
       const id = t.getAttribute("data-id");
-      state.modal = {kind:"atribuir", unitId:id};
+      state.modal = {kind:"atribuir", unitId:id, modoApoio:false};
       rerender();
       fetchAllProfiles().then(list=>{ state.usersList = list; rerender(); });
       return;
     }
-    if(action==="confirmar-atribuir"){
-      const unidadeId = t.getAttribute("data-unidade");
-      const tecnicoId = t.getAttribute("data-tecnico");
-      const nomeTec = t.getAttribute("data-nome");
-      await apiUpdateUnit(unidadeId, {assigned_to: tecnicoId, assigned_at: new Date().toISOString(), atualizado_em: new Date().toISOString()});
-      await apiAddHistorico(unidadeId, "rota", "Unidade atribuída pelo administrador a " + nomeTec + ".");
-      state.modal = null;
-      state.banner = "Unidade enviada para " + nomeTec + ".";
+    if(action==="abrir-pedir-apoio"){
+      const id = t.getAttribute("data-id");
+      state.modal = {kind:"atribuir", unitId:id, modoApoio:true};
       rerender();
-      setTimeout(()=>{ state.banner=""; rerender(); }, 3500);
+      fetchAllProfiles().then(list=>{ state.usersList = list; rerender(); });
+      return;
+    }
+    if(action==="confirmar-convite"){
+      const unidadeId = t.getAttribute("data-unidade");
+      const marcados = Array.from(document.querySelectorAll(".convite-check:checked"));
+      if(!marcados.length){ alert("Marque pelo menos um técnico."); return; }
+      const ids = marcados.map(el=>el.value);
+      const nomes = marcados.map(el=>el.getAttribute("data-nome"));
+      if(ids.length===1){
+        await apiUpdateUnit(unidadeId, {assigned_to: ids[0], assigned_at: new Date().toISOString(), tecnicos_convidados: [], atualizado_em: new Date().toISOString()});
+        await apiAddHistorico(unidadeId, "rota", "Unidade atribuída pelo administrador a " + nomes[0] + ".");
+        state.banner = "Unidade enviada para " + nomes[0] + ".";
+      }else{
+        await apiConvidarTecnicos(unidadeId, ids);
+        await apiAddHistorico(unidadeId, "rota", "Unidade oferecida pelo administrador a: " + nomes.join(", ") + ".");
+        state.banner = "Convite enviado para " + ids.length + " técnicos. Quem assumir primeiro fica com ela.";
+      }
+      state.modal = null;
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 4000);
+      await refreshUnits();
+      return;
+    }
+    if(action==="confirmar-apoio"){
+      const unidadeId = t.getAttribute("data-unidade");
+      const marcados = Array.from(document.querySelectorAll(".convite-check:checked"));
+      if(!marcados.length){ alert("Marque pelo menos um técnico."); return; }
+      const ids = marcados.map(el=>el.value);
+      const nomes = marcados.map(el=>el.getAttribute("data-nome"));
+      await apiConvidarTecnicos(unidadeId, ids);
+      await apiAddHistorico(unidadeId, "rota", "Apoio solicitado para: " + nomes.join(", ") + ".");
+      state.modal = null;
+      state.banner = "Pedido de apoio enviado.";
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 4000);
+      await refreshUnits();
+      return;
+    }
+    if(action==="aceitar-apoio"){
+      const id = t.getAttribute("data-id");
+      const ok = await apiAceitarApoio(id, state.profile.id, state.profile.nome);
+      if(!ok){
+        state.banner = "Já tem outro técnico ajudando nessa unidade.";
+      }else{
+        await apiAddHistorico(id, "rota", state.profile.nome + " aceitou o pedido de apoio.");
+        state.banner = "Apoio confirmado!";
+      }
+      rerender();
+      setTimeout(()=>{ state.banner=""; rerender(); }, 4000);
       await refreshUnits();
       return;
     }
