@@ -1,6 +1,6 @@
 // Toda vez que você publicar uma mudança no index.html, aumente esse número.
 // É essa mudança que faz o navegador perceber que existe versão nova.
-const CACHE_VERSION = "v8";
+const CACHE_VERSION = "v9";
 const CACHE_NAME = "painel-rota-" + CACHE_VERSION;
 
 const APP_SHELL = ["./", "./index.html", "./manifest.json"];
@@ -29,7 +29,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return; // deixa passar direto pra rede, sem cache
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, {cache: "no-store"})
       .then((res) => {
         const resClone = res.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(e.request, resClone));
