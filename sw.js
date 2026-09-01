@@ -1,6 +1,6 @@
 // Toda vez que você publicar uma mudança no index.html, aumente esse número.
 // É essa mudança que faz o navegador perceber que existe versão nova.
-const CACHE_VERSION = "v13";
+const CACHE_VERSION = "v14";
 const CACHE_NAME = "painel-rota-" + CACHE_VERSION;
 
 const APP_SHELL = ["./", "./index.html", "./manifest.json"];

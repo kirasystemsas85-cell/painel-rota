@@ -438,10 +438,11 @@
   async function apiDeleteCamera(id){
     await authFetch("/rest/v1/cameras?id=eq."+id, {method:"DELETE"});
   }
-  async function apiSalvarOS(unidade_id, servico_texto, responsavel_nome, assinatura_tecnico, assinatura_responsavel, foto_path, video_path){
+  async function apiSalvarOS(unidade_id, servico_texto, responsavel_nome, assinatura_tecnico, assinatura_responsavel, fotosPaths, videosPaths){
     const res = await authFetch("/rest/v1/ordens_servico", {method:"POST", headers:{"Prefer":"return=representation"}, body: JSON.stringify({
       unidade_id, tecnico_id: state.profile.id, tecnico_nome: state.profile.nome,
-      servico_texto, responsavel_nome, assinatura_tecnico, assinatura_responsavel, foto_path, video_path
+      servico_texto, responsavel_nome, assinatura_tecnico, assinatura_responsavel,
+      fotos_extra: fotosPaths||[], videos_extra: videosPaths||[]
     })});
     const data = await res.json();
     return data[0];
@@ -544,6 +545,28 @@
   function fetchOsAnexoUrl(path){
     return SUPABASE_URL + "/storage/v1/object/authenticated/os-anexos/" + path;
   }
+  function listaFotosOS(os){
+    const arr = [...(os.fotos_extra||[])];
+    if(os.foto_path && !arr.includes(os.foto_path)) arr.unshift(os.foto_path);
+    return arr;
+  }
+  function listaVideosOS(os){
+    const arr = [...(os.videos_extra||[])];
+    if(os.video_path && !arr.includes(os.video_path)) arr.unshift(os.video_path);
+    return arr;
+  }
+  async function baixarAnexoOS(path, nomeArquivo){
+    try{
+      const res = await authFetch("/storage/v1/object/authenticated/os-anexos/" + path);
+      if(!res.ok){ alert("Não foi possível baixar o arquivo."); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = nomeArquivo;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 8000);
+    }catch(e){ alert("Não foi possível baixar o arquivo: " + e.message); }
+  }
 
   async function gerarPdfOSBlob(os, unidade){
     const { jsPDF } = window.jspdf;
@@ -578,25 +601,27 @@
     doc.text(linhas, margin, y);
     y += linhas.length*13 + 12;
 
-    if(os.foto_path){
+    const fotos = listaFotosOS(os);
+    for(let i=0;i<fotos.length;i++){
       try{
-        const dataUrl = await fetchOsAnexoBase64(os.foto_path);
+        const dataUrl = await fetchOsAnexoBase64(fotos[i]);
         if(dataUrl){
           const imgW = pageW - margin*2;
           const imgH = imgW * 0.6;
           if(y + imgH > 740){ doc.addPage(); y = 50; }
           doc.setFontSize(9);
-          doc.text("Foto do serviço:", margin, y); y += 10;
+          doc.text("Foto " + (i+1) + " do serviço:", margin, y); y += 10;
           doc.addImage(dataUrl, "JPEG", margin, y, imgW, imgH);
           y += imgH + 16;
         }
       }catch(e){}
     }
-    if(os.video_path){
+    const videos = listaVideosOS(os);
+    if(videos.length){
       if(y > 730){ doc.addPage(); y = 50; }
       doc.setFontSize(9);
       doc.setTextColor(120);
-      doc.text("Vídeo anexado ao registro (não incluso neste PDF, disponível no sistema).", margin, y);
+      doc.text(videos.length + " vídeo(s) anexado(s) ao registro (não inclusos neste PDF, disponíveis no sistema).", margin, y);
       doc.setTextColor(0);
       y += 22;
     }
@@ -1365,6 +1390,7 @@
           <div class="hist-date"><b>${esc(os.tecnico_nome||"—")}</b> · ${fmtDate(os.criado_em)} · Responsável: ${esc(os.responsavel_nome||"—")}</div>
           <div class="hist-text">${esc(os.servico_texto||"(sem descrição)")}</div>
           <div class="unit-actions" style="margin-top:6px;max-width:220px;"><button class="btn-sm" data-action="baixar-pdf-os" data-id="${os.id}">Baixar / Enviar PDF</button></div>
+          ${renderAnexosOSBotoes(os)}
         </div>`).join("") : `<div class="no-hist">Nenhuma OS assinada ainda nesta unidade.</div>`}
     </div>
     `;
@@ -1586,6 +1612,7 @@
           <div class="report-tech">${esc(os.tecnico_nome||"—")} · Responsável: ${esc(os.responsavel_nome||"—")}</div>
           <div class="report-text">${esc(os.servico_texto||"(sem descrição)")}</div>
           <div class="unit-actions" style="margin-top:8px;max-width:200px;"><button class="btn-sm route" data-action="baixar-pdf-os" data-id="${os.id}">Baixar / Enviar PDF</button></div>
+          ${renderAnexosOSBotoes(os)}
         </div>`;
       }).join("");
       const dataFmt = new Date(dia+"T00:00:00").toLocaleDateString("pt-BR",{weekday:"long", day:"2-digit", month:"long"});
@@ -1708,6 +1735,14 @@
         no Supabase até ser apagado por lá. "Bloquear" é reversível e não apaga nada — só suspende o acesso.
       </div>
     </div>`;
+  }
+  function renderAnexosOSBotoes(os){
+    const fotos = listaFotosOS(os);
+    const videos = listaVideosOS(os);
+    if(!fotos.length && !videos.length) return "";
+    const botoesFotos = fotos.map((p,i)=>`<button class="btn-sm" data-action="baixar-anexo-os" data-path="${esc(p)}" data-nome="foto-${i+1}.jpg">📷 Baixar foto ${i+1}</button>`).join("");
+    const botoesVideos = videos.map((p,i)=>`<button class="btn-sm" data-action="baixar-anexo-os" data-path="${esc(p)}" data-nome="video-${i+1}.mp4">🎬 Baixar vídeo ${i+1}</button>`).join("");
+    return `<div class="unit-actions" style="margin-top:6px;flex-wrap:wrap;max-width:320px;">${botoesFotos}${botoesVideos}</div>`;
   }
   function areaLabel(a){
     return {tecnica:"Técnica", rondas:"Rondas", rh:"RH"}[a] || a;
@@ -1898,13 +1933,13 @@
           <textarea id="os-servico" style="min-height:80px;" placeholder="Descreva o que foi feito nesta unidade...">${esc(m.servico||"")}</textarea>
           <div class="field-gap" style="margin-top:10px;"><label>Nome do responsável pela unidade</label><input id="os-responsavel" type="text" value="${esc(m.responsavel||"")}" placeholder="Quem está recebendo o serviço"></div>
 
-          <label style="margin-top:14px;display:block;">Anexos (opcional)</label>
+          <label style="margin-top:14px;display:block;">Anexos (opcional, pode adicionar mais de um)</label>
           <div class="unit-actions" style="margin-bottom:6px;">
-            <button type="button" class="btn-mini" data-action="anexar-foto-os">${m.fotoNome?"Trocar foto":"Anexar foto"}</button>
-            <button type="button" class="btn-mini" data-action="anexar-video-os">${m.videoNome?"Trocar vídeo":"Anexar vídeo"}</button>
+            <button type="button" class="btn-mini" data-action="anexar-foto-os">+ Adicionar foto</button>
+            <button type="button" class="btn-mini" data-action="anexar-video-os">+ Adicionar vídeo</button>
           </div>
-          ${m.fotoNome ? `<div style="font-size:12px;color:var(--text-dim);">📷 ${esc(m.fotoNome)} <button type="button" data-action="remover-anexo-os" data-tipo="foto" style="background:none;color:var(--red);border:none;font-size:12px;">remover</button></div>` : ""}
-          ${m.videoNome ? `<div style="font-size:12px;color:var(--text-dim);">🎬 ${esc(m.videoNome)} <button type="button" data-action="remover-anexo-os" data-tipo="video" style="background:none;color:var(--red);border:none;font-size:12px;">remover</button></div>` : ""}
+          ${(m.fotoFiles||[]).map((f,i)=>`<div style="font-size:12px;color:var(--text-dim);">📷 ${esc(f.name)} <button type="button" data-action="remover-anexo-os" data-tipo="foto" data-idx="${i}" style="background:none;color:var(--red);border:none;font-size:12px;">remover</button></div>`).join("")}
+          ${(m.videoFiles||[]).map((f,i)=>`<div style="font-size:12px;color:var(--text-dim);">🎬 ${esc(f.name)} <button type="button" data-action="remover-anexo-os" data-tipo="video" data-idx="${i}" style="background:none;color:var(--red);border:none;font-size:12px;">remover</button></div>`).join("")}
 
           <label style="margin-top:14px;display:block;">Assinatura do técnico</label>
           <canvas id="sig-tecnico" width="500" height="150" style="width:100%;height:120px;background:#fff;border-radius:8px;touch-action:none;display:block;"></canvas>
@@ -2220,6 +2255,15 @@
       }, 6000);
       return;
     }
+    if(action==="baixar-anexo-os"){
+      const path = t.getAttribute("data-path");
+      const nome = t.getAttribute("data-nome");
+      const textoOriginal = t.textContent;
+      t.disabled = true; t.textContent = "Baixando...";
+      await baixarAnexoOS(path, nome);
+      t.disabled = false; t.textContent = textoOriginal;
+      return;
+    }
     if(action==="baixar-pdf-os"){
       const id = t.getAttribute("data-id");
       const os = state.osList.find(x=>x.id===id) || state.osDaUnidade.find(x=>x.id===id);
@@ -2499,7 +2543,7 @@
       rerender(); return;
     }
     if(action==="abrir-assinatura"){
-      state.modal={kind:"assinatura", unitId:t.getAttribute("data-id"), servico:"", responsavel:""};
+      state.modal={kind:"assinatura", unitId:t.getAttribute("data-id"), servico:"", responsavel:"", fotoFiles:[], videoFiles:[]};
       rerender(); return;
     }
     if(action==="limpar-assinatura"){
@@ -2510,8 +2554,9 @@
     if(action==="anexar-video-os"){ osVideoInput.value=""; osVideoInput.click(); return; }
     if(action==="remover-anexo-os"){
       const tipo = t.getAttribute("data-tipo");
-      if(tipo==="foto"){ state.modal.fotoFile=null; state.modal.fotoNome=null; }
-      else{ state.modal.videoFile=null; state.modal.videoNome=null; }
+      const idx = parseInt(t.getAttribute("data-idx"),10);
+      if(tipo==="foto"){ state.modal.fotoFiles.splice(idx,1); }
+      else{ state.modal.videoFiles.splice(idx,1); }
       rerender(); return;
     }
     if(action==="salvar-os"){
@@ -2534,10 +2579,15 @@
       salvarBtn.disabled = true;
       salvarBtn.textContent = "Salvando...";
       try{
-        let fotoPath = null, videoPath = null;
-        if(state.modal.fotoFile) fotoPath = await apiUploadOsAnexo(state.modal.fotoFile, unidadeId, "foto");
-        if(state.modal.videoFile) videoPath = await apiUploadOsAnexo(state.modal.videoFile, unidadeId, "video");
-        const osSalva = await apiSalvarOS(unidadeId, servico, responsavel, assinaturaTecnico, assinaturaResponsavel, fotoPath, videoPath);
+        const fotosPaths = [];
+        for(const f of (state.modal.fotoFiles||[])){
+          fotosPaths.push(await apiUploadOsAnexo(f, unidadeId, "foto"));
+        }
+        const videosPaths = [];
+        for(const f of (state.modal.videoFiles||[])){
+          videosPaths.push(await apiUploadOsAnexo(f, unidadeId, "video"));
+        }
+        const osSalva = await apiSalvarOS(unidadeId, servico, responsavel, assinaturaTecnico, assinaturaResponsavel, fotosPaths, videosPaths);
         state.modal = null;
         state.banner = "Ordem de serviço salva! Preparando PDF...";
         rerender();
@@ -2668,8 +2718,8 @@
   osFotoInput.addEventListener("change", ()=>{
     const file = osFotoInput.files && osFotoInput.files[0];
     if(!file || !state.modal || state.modal.kind!=="assinatura") return;
-    state.modal.fotoFile = file;
-    state.modal.fotoNome = file.name;
+    if(!state.modal.fotoFiles) state.modal.fotoFiles = [];
+    state.modal.fotoFiles.push(file);
     rerender();
   });
 
@@ -2681,8 +2731,8 @@
   osVideoInput.addEventListener("change", ()=>{
     const file = osVideoInput.files && osVideoInput.files[0];
     if(!file || !state.modal || state.modal.kind!=="assinatura") return;
-    state.modal.videoFile = file;
-    state.modal.videoNome = file.name;
+    if(!state.modal.videoFiles) state.modal.videoFiles = [];
+    state.modal.videoFiles.push(file);
     rerender();
   });
 
