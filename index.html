@@ -865,9 +865,13 @@
   async function carregarEquipeProxima(unit){
     state.modal = {kind:"equipe-proxima", unitId:unit.id, carregando:true, erro:null, lista:[]};
     rerender();
-    const coordUnidade = await geocodificarEndereco(unit.endereco || unit.nome);
+    const textoBusca = unit.endereco || unit.nome;
+    let coordUnidade = await geocodificarEndereco(textoBusca);
+    if(!coordUnidade && !/brasil|brazil/i.test(textoBusca)){
+      coordUnidade = await geocodificarEndereco(textoBusca + ", Brasil");
+    }
     if(!coordUnidade){
-      state.modal = {kind:"equipe-proxima", unitId:unit.id, carregando:false, erro:"Não consegui localizar o endereço dessa unidade no mapa.", lista:[]};
+      state.modal = {kind:"equipe-proxima", unitId:unit.id, carregando:false, erro:"Não consegui localizar \"" + textoBusca + "\" no mapa. Verifique se o endereço da unidade está completo (rua, número e cidade).", lista:[]};
       rerender(); return;
     }
     const [perfis, presencas] = await Promise.all([fetchAllProfiles(), fetchPresencaOnline()]);
