@@ -846,6 +846,57 @@
     window.open("https://www.google.com/maps/search/?api=1&query="+q, "_blank");
   }
 
+  function distanciaKm(lat1, lng1, lat2, lng2){
+    const R = 6371;
+    const dLat = (lat2-lat1) * Math.PI/180;
+    const dLng = (lng2-lng1) * Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+  async function geocodificarEndereco(endereco){
+    try{
+      const res = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(endereco));
+      if(!res.ok) return null;
+      const data = await res.json();
+      if(!data.length) return null;
+      return {lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon)};
+    }catch(e){ return null; }
+  }
+  async function carregarEquipeProxima(unit){
+    state.modal = {kind:"equipe-proxima", unitId:unit.id, carregando:true, erro:null, lista:[]};
+    rerender();
+    const coordUnidade = await geocodificarEndereco(unit.endereco || unit.nome);
+    if(!coordUnidade){
+      state.modal = {kind:"equipe-proxima", unitId:unit.id, carregando:false, erro:"Não consegui localizar o endereço dessa unidade no mapa.", lista:[]};
+      rerender(); return;
+    }
+    const [perfis, presencas] = await Promise.all([fetchAllProfiles(), fetchPresencaOnline()]);
+    const agora = Date.now();
+    const lista = perfis
+      .filter(p=>p.role!=="admin")
+      .map(p=>{
+        const pres = presencas.find(x=>x.pessoa_id===p.id);
+        const online = pres && pres.last_seen && (agora - new Date(pres.last_seen).getTime()) < 90000;
+        const temLoc = pres && pres.lat!=null && pres.lng!=null;
+        return {
+          nome: p.nome,
+          online, temLoc,
+          lat: temLoc?pres.lat:null, lng: temLoc?pres.lng:null,
+          locAtualizadaEm: temLoc?pres.loc_atualizada_em:null,
+          dist: temLoc ? distanciaKm(coordUnidade.lat, coordUnidade.lng, pres.lat, pres.lng) : null
+        };
+      })
+      .filter(p=>p.online)
+      .sort((a,b)=>{
+        if(a.temLoc && b.temLoc) return a.dist - b.dist;
+        if(a.temLoc) return -1;
+        if(b.temLoc) return 1;
+        return a.nome.localeCompare(b.nome);
+      });
+    state.modal = {kind:"equipe-proxima", unitId:unit.id, carregando:false, erro:null, lista};
+    rerender();
+  }
+
   function compartilharLocalizacao(unit){
     if(!navigator.geolocation){
       state.banner = "Este navegador não permite acessar a localização.";
@@ -1647,6 +1698,34 @@
     return {tecnica:"Técnica", rondas:"Rondas", rh:"RH"}[a] || a;
   }
   function renderModal(){
+    if(state.modal.kind === "equipe-proxima"){
+      const m = state.modal;
+      const u = state.units.find(x=>x.id===m.unitId);
+      let corpo;
+      if(m.carregando){
+        corpo = `<p style="font-size:13.5px;color:var(--text-dim);">Calculando quem está mais perto...</p>`;
+      }else if(m.erro){
+        corpo = `<p style="font-size:13.5px;color:var(--red);">${esc(m.erro)}</p>`;
+      }else if(!m.lista.length){
+        corpo = `<div class="no-hist">Nenhum técnico online no momento.</div>`;
+      }else{
+        corpo = m.lista.map((p,i)=>`
+          <div class="hist-entry">
+            <div class="hist-date"><b>${i+1}º — ${esc(p.nome)}</b></div>
+            <div class="hist-text">${p.temLoc ? (p.dist.toFixed(1)+" km de distância (aprox.)") : "Online, mas ainda sem localização recente"}</div>
+            ${p.temLoc ? `<a href="https://www.google.com/maps/dir/?api=1&origin=${p.lat},${p.lng}&destination=${encodeURIComponent(u?(u.endereco||u.nome):"")}" target="_blank" class="btn-mini" style="display:inline-block;text-decoration:none;margin-top:6px;">Ver rota até a unidade</a>` : ""}
+          </div>`).join("");
+      }
+      return `
+      <div class="modal-overlay" data-action="modal-overlay">
+        <div class="modal-box" data-stop="1">
+          <div class="modal-title">Equipe mais perto — ${esc(u?u.nome:"")}</div>
+          <p style="font-size:12px;color:var(--text-dim);margin:-8px 0 12px;">Só considera técnicos com o app aberto agora e que já tiveram a localização puxada na aba "Online".</p>
+          ${corpo}
+          <div class="modal-actions"><button type="button" class="btn-cancel" data-action="close-modal">Fechar</button></div>
+        </div>
+      </div>`;
+    }
     if(state.modal.kind === "atribuir"){
       const m = state.modal;
       const u = state.units.find(x=>x.id===m.unitId);
@@ -2366,7 +2445,10 @@
 
     if(action==="route"){
       const u = state.units.find(x=>x.id===t.getAttribute("data-id"));
-      if(u) openRouteFor(u);
+      if(u){
+        openRouteFor(u);
+        if(isAdmin()) carregarEquipeProxima(u);
+      }
       return;
     }
     if(action==="compartilhar-localizacao"){
