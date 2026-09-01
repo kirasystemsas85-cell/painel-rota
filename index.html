@@ -862,14 +862,25 @@
       return {lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon)};
     }catch(e){ return null; }
   }
+  async function geocodificarEnderecoRobusto(enderecoOriginal){
+    const tentativas = [];
+    const limpo = enderecoOriginal.replace(/CEP:?\s*/i, ", ").replace(/\s*,\s*,+/g, ", ").trim();
+    tentativas.push(limpo);
+    if(!/brasil|brazil/i.test(limpo)) tentativas.push(limpo + ", Brasil");
+    const cepMatch = enderecoOriginal.match(/(\d{5}-?\d{3})/);
+    if(cepMatch) tentativas.push(cepMatch[1] + ", Brasil");
+    for(const t of tentativas){
+      const r = await geocodificarEndereco(t);
+      if(r) return r;
+    }
+    return null;
+  }
+
   async function carregarEquipeProxima(unit){
     state.modal = {kind:"equipe-proxima", unitId:unit.id, carregando:true, erro:null, lista:[]};
     rerender();
     const textoBusca = unit.endereco || unit.nome;
-    let coordUnidade = await geocodificarEndereco(textoBusca);
-    if(!coordUnidade && !/brasil|brazil/i.test(textoBusca)){
-      coordUnidade = await geocodificarEndereco(textoBusca + ", Brasil");
-    }
+    const coordUnidade = await geocodificarEnderecoRobusto(textoBusca);
     if(!coordUnidade){
       state.modal = {kind:"equipe-proxima", unitId:unit.id, carregando:false, erro:"Não consegui localizar \"" + textoBusca + "\" no mapa. Verifique se o endereço da unidade está completo (rua, número e cidade).", lista:[]};
       rerender(); return;
